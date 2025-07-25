@@ -1,0 +1,50 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: lightspeed-exporter
+  namespace: lsdv-exporter
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: lightspeed-exporter
+rules:
+# Read pull-secret from openshift-config namespace
+- apiGroups: [""]
+  resources: ["secrets"]
+  resourceNames: ["pull-secret"]
+  verbs: ["get"]
+  # Restrict to openshift-config namespace in ClusterRoleBinding
+# Read cluster version for identity
+- apiGroups: ["config.openshift.io"]
+  resources: ["clusterversions"]
+  verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: lightspeed-exporter
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: lightspeed-exporter
+subjects:
+- kind: ServiceAccount
+  name: lightspeed-exporter
+  namespace: lsdv-exporter
+---
+# Additional role binding for accessing secrets in openshift-config
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: lightspeed-exporter-pull-secret
+  namespace: openshift-config
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: lightspeed-exporter
+subjects:
+- kind: ServiceAccount
+  name: lightspeed-exporter
+  namespace: lsdv-exporter 

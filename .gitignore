@@ -205,3 +205,17 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# ignore python and editors cache
+__pycache__
+__pypackages__
+.env*
+.vscode
+.DS_Store
+
+# ignore venv
+venv
+.venv
+.pdm-python
+dev/
+test-data/
