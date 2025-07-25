@@ -1,0 +1,14 @@
+# Lightspeed to Dataverse Exporter Configuration
+# Copy this file to config.yaml and fill in your values
+
+# Required settings
+data_dir: "/path/to/your/data/directory"
+service_id: "your-service-id"
+ingress_server_url: "https://your-ingress-server.example.com/api/data"
+ingress_server_auth_token: "your-auth-token-here"
+
+# Optional settings (with defaults shown)
+identity_id: "unknown"                    # Identifier for this instance
+collection_interval: 300                 # Collection interval in seconds (5 minutes)
+cleanup_after_send: true                 # Remove files after successful upload
+ingress_connection_timeout: 30           # HTTP timeout in seconds

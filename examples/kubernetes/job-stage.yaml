@@ -1,0 +1,81 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: lightspeed-exporter-test-stage
+  namespace: lsdv-exporter
+  labels:
+    app: lightspeed-exporter
+    type: test
+    environment: stage
+spec:
+  template:
+    metadata:
+      labels:
+        app: lightspeed-exporter
+        type: test
+        environment: stage
+    spec:
+      serviceAccountName: lightspeed-exporter
+      containers:
+      - name: lightspeed-exporter
+        # Update this image when you push to your registry
+        image: "quay.io/ometelka/lightspeed-dataverse-exporter:latest"
+        imagePullPolicy: Always
+        command: ["python", "-m", "src.main"]
+        args:
+        - "--mode"
+        - "manual"
+        - "--config"
+        - "/etc/config/config.yaml"
+        - "--log-level"
+        - "DEBUG"
+        - "--collection-interval"
+        - "30"  # Shorter interval for testing
+        - "--ingress-server-auth-token"
+        - "$(AUTH_TOKEN)"
+        - "--identity-id"
+        - "$(IDENTITY_ID)"
+        volumeMounts:
+        - name: config
+          mountPath: /etc/config
+          readOnly: true
+        - name: data
+          mountPath: /data
+        - name: sample-data
+          mountPath: /data/feedback/sample-lightspeed-data.json
+          subPath: sample-lightspeed-data.json
+          readOnly: true
+        env:
+        - name: PYTHONUNBUFFERED
+          value: "1"
+        - name: UV_CACHE_DIR
+          value: "/tmp/uv-cache"
+        - name: AUTH_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: lightspeed-exporter-stage-secrets
+              key: auth-token
+        - name: IDENTITY_ID
+          valueFrom:
+            secretKeyRef:
+              name: lightspeed-exporter-stage-secrets
+              key: identity-id
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "50m"
+      volumes:
+      - name: config
+        configMap:
+          name: lightspeed-exporter-config-stage
+      - name: data
+        emptyDir: {}
+      - name: sample-data
+        configMap:
+          name: lightspeed-exporter-config-stage
+      restartPolicy: Never
+  backoffLimit: 3 

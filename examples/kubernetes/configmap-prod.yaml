@@ -1,0 +1,32 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: lightspeed-exporter-config-prod
+  namespace: lsdv-exporter
+data:
+  config.yaml: |
+    # Production environment configuration - uses openshift mode with cluster auth
+    data_dir: "/data"
+    service_id: "ols"
+    ingress_server_url: "https://console.redhat.com/api/ingress/v1/upload"
+    
+    # Collection settings
+    collection_interval: 7200  # 2 hours (default production interval)
+    cleanup_after_send: true
+    ingress_connection_timeout: 30
+    
+    # Note: ingress_server_auth_token and identity_id are automatically 
+    # retrieved from the OpenShift cluster in openshift mode
+  
+  # Sample data for testing
+  sample-lightspeed-data.json: |
+    {
+      "user_id": "user_id_placeholder",
+      "timestamp": "2025-07-24 13:16:49.140050+00:00",
+      "conversation_id": "123e4567-e89b-12d3-a456-426614174000",
+      "user_question": "What is XYZ",
+      "llm_response": "Some elaborate answer",
+      "sentiment": 1,
+      "user_feedback": ""
+    } 
