@@ -93,31 +93,56 @@ class DataCollectorService:
             connection_timeout=ingress_connection_timeout,
         )
 
+    def _process_data_collection(self) -> None:
+        """Process a single data collection cycle."""
+        collected_files = self.file_handler.collect_files()
+        data_chunks = self.file_handler.gather_data_chunks(collected_files)
+
+        if data_chunks:
+            self._handle_upload_batch(data_chunks, collected_files)
+        else:
+            logger.info("No data marked for collection in '%s'", self.data_dir)
+
+    def _handle_upload_batch(
+        self, data_chunks: list[list[Path]], collected_files: list[tuple[Path, int]]
+    ) -> None:
+        """Handle uploading a batch of data chunks.
+
+        Args:
+            data_chunks: List of data chunks to upload
+            collected_files: Original collected files for cleanup
+        """
+        for i, data_chunk in enumerate(data_chunks):
+            logger.info("Uploading data chunk %d/%d", i + 1, len(data_chunks))
+            self._upload_single_chunk(data_chunk)
+
+        # Perform final cleanup after all chunks are uploaded
+        if self.cleanup_after_send:
+            self.file_handler.ensure_size_limit(collected_files)
+
+    def _upload_single_chunk(self, data_chunk: list[Path]) -> None:
+        """Upload a single data chunk.
+
+        Args:
+            data_chunk: List of file paths to upload in this chunk
+        """
+        tarball = package_files_into_tarball(
+            data_chunk, path_to_strip=self.data_dir.as_posix()
+        )
+        logger.debug("Successfully packed data chunk into tarball")
+        self.ingress_client.upload_tarball(tarball)
+
+        # Clean up chunk files after successful upload
+        if self.cleanup_after_send:
+            self.file_handler.delete_collected_files(data_chunk)
+
     def run(self) -> None:
         """Run the periodic data collection loop."""
         logger.info("Starting data collection service")
 
         while True:
             try:
-                collected_files = self.file_handler.collect_files()
-                data_chunks = self.file_handler.gather_data_chunks(collected_files)
-
-                if data_chunks:
-                    for i, data_chunk in enumerate(data_chunks):
-                        logger.info(
-                            "Uploading data chunk %d/%d", i + 1, len(data_chunks)
-                        )
-                        tarball = package_files_into_tarball(
-                            data_chunk, path_to_strip=self.data_dir.as_posix()
-                        )
-                        logger.debug("Successfully packed data chunk into tarball")
-                        self.ingress_client.upload_tarball(tarball)
-                        if self.cleanup_after_send:
-                            self.file_handler.delete_collected_files(data_chunk)
-                    if self.cleanup_after_send:
-                        self.file_handler.ensure_size_limit(collected_files)
-                else:
-                    logger.info("No data marked for collection in '%s'", self.data_dir)
+                self._process_data_collection()
                 logger.info(
                     "Waiting %d seconds before next collection",
                     self.collection_interval,
