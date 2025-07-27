@@ -3,6 +3,12 @@
 
 # Required settings
 data_dir: "/path/to/your/data/directory"
+
+# List of subdirectories to collect from
+# Empty list or not specified = collect from all subdirectories
+# Example: ["feedback", "transcripts", "logs"]
+# allowed_subdirs: []  
+
 service_id: "your-service-id"
 ingress_server_url: "https://your-ingress-server.example.com/api/data"
 ingress_server_auth_token: "your-auth-token-here"
