@@ -79,6 +79,12 @@ def parse_args() -> argparse.Namespace:
     )
 
     parser.add_argument(
+        "--allowed-subdirs",
+        nargs="*",
+        help="List of allowed subdirectories to collect from (space-separated). If not specified, uses default subdirs from config.",
+    )
+
+    parser.add_argument(
         "--log-level",
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
         default="INFO",
@@ -173,6 +179,8 @@ def main() -> int:
                 if args.no_cleanup
                 else (settings.cleanup_after_send if settings else True)
             ),
+            allowed_subdirs=args.allowed_subdirs
+            or (settings.allowed_subdirs if settings else []),
         )
 
         service.run()

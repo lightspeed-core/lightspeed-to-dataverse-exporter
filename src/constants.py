@@ -3,13 +3,10 @@ ACCESS_TOKEN_GENERATION_TIMEOUT = 10
 # Data collection constants
 TARBALL_FILENAME = "lightspeed-assistant.tgz"  # have no effect
 
-# This is a list of subdirectories that are allowed to be collected from
-# the provided data_dir - it is here to prevent collecting unexpected data
-# but it can be removed eventually as it is not purpose of this service
-# do sanity check on provided data to export.
-ALLOWED_SUBDIRS = ["feedback", "transcripts"]
-
-DATA_MAX_SIZE = 100 * 1024 * 1024  # 100 MiB
+# 100 MiB - Maximum size of a single payload/chunk
+MAX_PAYLOAD_SIZE = 100 * 1024 * 1024
+# 200 MiB - Maximum total size of data directory
+MAX_DATA_DIR_SIZE = 2 * MAX_PAYLOAD_SIZE
 
 # This user-agent work with any identity_id and correctly passes
 # this id further down the road, but it is a hack and depends on

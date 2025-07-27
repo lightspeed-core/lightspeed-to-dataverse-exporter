@@ -48,6 +48,7 @@ class TestDataCollectorSettings:
         assert settings.collection_interval == 7200  # Default from constants
         assert settings.cleanup_after_send is True
         assert settings.ingress_connection_timeout == 30  # Default from constants
+        assert settings.allowed_subdirs == []  # Default: collect everything
 
     def test_invalid_data_dir(self):
         """Test validation error for non-existent data directory."""
@@ -103,6 +104,26 @@ class TestDataCollectorSettings:
             assert settings.collection_interval == 600
             assert settings.cleanup_after_send is False
             assert settings.ingress_connection_timeout == 60
+            assert settings.allowed_subdirs == []  # Default when not in YAML
+        finally:
+            config_file.unlink()
+
+    def test_custom_allowed_subdirs_from_yaml(self):
+        """Test loading custom allowed_subdirs from YAML file."""
+        config_data = {
+            "data_dir": "/tmp",
+            "service_id": "yaml-service",
+            "ingress_server_url": "https://example.com/api/v1/upload",
+            "allowed_subdirs": ["logs", "metrics", "traces"],
+        }
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+            yaml.dump(config_data, f)
+            config_file = Path(f.name)
+
+        try:
+            settings = DataCollectorSettings.from_yaml(config_file)
+            assert settings.allowed_subdirs == ["logs", "metrics", "traces"]
         finally:
             config_file.unlink()
 

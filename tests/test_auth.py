@@ -5,7 +5,6 @@ from unittest.mock import Mock, patch
 import kubernetes
 import json
 import base64
-import requests
 
 from src.auth import (
     AuthProvider,
@@ -16,7 +15,11 @@ from src.auth import (
     get_openshift_auth_provider,
     get_manual_auth_provider,
 )
-from src.auth.providers import access_token_from_offline_token, ClusterPullSecretNotFoundError, ClusterIDNotFoundError
+from src.auth.providers import (
+    access_token_from_offline_token,
+    ClusterPullSecretNotFoundError,
+    ClusterIDNotFoundError,
+)
 
 
 class TestAuthProvider:
@@ -151,17 +154,17 @@ class TestOpenShiftAuthProvider:
         """Test get_auth_token handles KeyError when pull secret is malformed."""
         mock_client = Mock()
         mock_core_v1.return_value = mock_client
-        
+
         # Mock secret with missing keys
         mock_secret = Mock()
         mock_secret.data = {}  # Missing .dockerconfigjson key
         mock_client.read_namespaced_secret.return_value = mock_secret
-        
+
         provider = OpenShiftAuthProvider()
-        
+
         with pytest.raises(ClusterPullSecretNotFoundError) as exc_info:
             provider.get_auth_token()
-        
+
         assert "Missing required keys in pull secret" in str(exc_info.value)
 
     @patch("src.auth.providers.kubernetes.config.load_incluster_config")
@@ -170,18 +173,18 @@ class TestOpenShiftAuthProvider:
         """Test get_auth_token handles JSONDecodeError when pull secret data is invalid."""
         mock_client = Mock()
         mock_core_v1.return_value = mock_client
-        
+
         # Mock secret with invalid JSON
         mock_secret = Mock()
         invalid_json = base64.b64encode(b"invalid json").decode("utf-8")
         mock_secret.data = {".dockerconfigjson": invalid_json}
         mock_client.read_namespaced_secret.return_value = mock_secret
-        
+
         provider = OpenShiftAuthProvider()
-        
+
         with pytest.raises(ClusterPullSecretNotFoundError) as exc_info:
             provider.get_auth_token()
-        
+
         assert "Invalid pull secret format" in str(exc_info.value)
 
     @patch("src.auth.providers.kubernetes.config.load_incluster_config")
@@ -190,64 +193,68 @@ class TestOpenShiftAuthProvider:
         """Test get_auth_token handles Kubernetes API exceptions."""
         mock_client = Mock()
         mock_core_v1.return_value = mock_client
-        
+
         # Mock API exception
         api_error = kubernetes.client.exceptions.ApiException(
             status=404, reason="Not Found"
         )
         api_error.body = "Secret not found"
         mock_client.read_namespaced_secret.side_effect = api_error
-        
+
         provider = OpenShiftAuthProvider()
-        
+
         with pytest.raises(ClusterPullSecretNotFoundError) as exc_info:
             provider.get_auth_token()
-        
+
         assert "Cannot access pull secret" in str(exc_info.value)
 
     @patch("src.auth.providers.kubernetes.config.load_incluster_config")
     @patch("src.auth.providers.kubernetes.client.CoreV1Api")
     @patch("src.auth.providers.kubernetes.client.CustomObjectsApi")
-    def test_get_identity_id_key_error(self, mock_custom_api, mock_core_v1, mock_load_config):
+    def test_get_identity_id_key_error(
+        self, mock_custom_api, mock_core_v1, mock_load_config
+    ):
         """Test get_identity_id handles KeyError when cluster version is malformed."""
         mock_client = Mock()
         mock_core_v1.return_value = mock_client
         mock_custom_client = Mock()
         mock_custom_api.return_value = mock_custom_client
-        
+
         # Mock cluster version response missing clusterID
         cluster_version = {"spec": {}}  # Missing clusterID
         mock_custom_client.get_cluster_custom_object.return_value = cluster_version
-        
+
         provider = OpenShiftAuthProvider()
-        
+
         with pytest.raises(ClusterIDNotFoundError) as exc_info:
             provider.get_identity_id()
-        
+
         assert "Missing cluster ID in cluster version" in str(exc_info.value)
 
     @patch("src.auth.providers.kubernetes.config.load_incluster_config")
     @patch("src.auth.providers.kubernetes.client.CoreV1Api")
     @patch("src.auth.providers.kubernetes.client.CustomObjectsApi")
-    def test_get_identity_id_api_exception(self, mock_custom_api, mock_core_v1, mock_load_config):
+    def test_get_identity_id_api_exception(
+        self, mock_custom_api, mock_core_v1, mock_load_config
+    ):
         """Test get_identity_id handles Kubernetes API exceptions."""
         mock_client = Mock()
         mock_core_v1.return_value = mock_client
         mock_custom_client = Mock()
         mock_custom_api.return_value = mock_custom_client
-        
+
         # Mock API exception
         api_error = kubernetes.client.exceptions.ApiException(
             status=403, reason="Forbidden"
         )
         api_error.body = "Access denied"
         mock_custom_client.get_cluster_custom_object.side_effect = api_error
-        
+
         provider = OpenShiftAuthProvider()
-        
+
         with pytest.raises(ClusterIDNotFoundError) as exc_info:
             provider.get_identity_id()
-        
+
         assert "Cannot access cluster version" in str(exc_info.value)
 
 
@@ -262,12 +269,12 @@ class TestAccessTokenFromOfflineToken:
         mock_response.status_code = 200
         mock_response.json.return_value = {"access_token": "test-access-token"}
         mock_post.return_value = mock_response
-        
+
         result = access_token_from_offline_token("offline-token-123")
-        
+
         assert result == "test-access-token"
         mock_post.assert_called_once()
-        
+
         # Check the request parameters
         call_args = mock_post.call_args
         assert "sso.stage.redhat.com" in call_args[0][0]
@@ -283,10 +290,10 @@ class TestAccessTokenFromOfflineToken:
         mock_response.status_code = 401
         mock_response.json.return_value = {"error": "invalid_token"}
         mock_post.return_value = mock_response
-        
+
         with pytest.raises(Exception) as exc_info:
             access_token_from_offline_token("invalid-token")
-        
+
         assert "Failed to generate access token" in str(exc_info.value)
         assert "invalid_token" in str(exc_info.value)
 
@@ -299,11 +306,13 @@ class TestAccessTokenFromOfflineToken:
         mock_response.json.side_effect = json.JSONDecodeError("Invalid JSON", "", 0)
         mock_response.text = "Internal Server Error"
         mock_post.return_value = mock_response
-        
+
         with pytest.raises(Exception) as exc_info:
             access_token_from_offline_token("offline-token-123")
-        
-        assert "Failed to generate access token. Response is not JSON" in str(exc_info.value)
+
+        assert "Failed to generate access token. Response is not JSON" in str(
+            exc_info.value
+        )
         assert "Internal Server Error" in str(exc_info.value)
 
 
