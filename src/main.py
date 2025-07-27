@@ -91,15 +91,58 @@ def parse_args() -> argparse.Namespace:
         help="Set the logging level",
     )
 
+    parser.add_argument(
+        "--rich-logs",
+        action="store_true",
+        help="Enable rich colored logging output",
+    )
+
     return parser.parse_args()
 
 
-def configure_logging(log_level: str) -> None:
-    """Configure logging."""
-    logging.basicConfig(
-        level=getattr(logging, log_level),
-        format="%(asctime)s [%(name)s:%(filename)s:%(lineno)d] %(levelname)s: %(message)s",
-    )
+def configure_logging(log_level: str, use_rich: bool = False) -> None:
+    """Configure logging with optional rich formatting.
+
+    Args:
+        log_level: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+        use_rich: Whether to use rich colored logging
+    """
+    if use_rich:
+        try:
+            from rich.logging import RichHandler
+            from rich.console import Console
+
+            # Create console with color detection
+            console = Console()
+
+            # Configure rich logging
+            logging.basicConfig(
+                level=getattr(logging, log_level),
+                format="%(message)s",
+                datefmt="[%X]",
+                handlers=[
+                    RichHandler(
+                        console=console,
+                        show_path=True,
+                        show_time=True,
+                        show_level=True,
+                        markup=True,
+                        rich_tracebacks=True,
+                    )
+                ],
+            )
+        except ImportError:
+            # Fall back to standard logging if rich is not available
+            logging.basicConfig(
+                level=getattr(logging, log_level),
+                format="%(asctime)s [%(name)s:%(filename)s:%(lineno)d] %(levelname)s: %(message)s",
+            )
+    else:
+        logging.basicConfig(
+            level=getattr(logging, log_level),
+            format="%(asctime)s [%(name)s:%(filename)s:%(lineno)d] %(levelname)s: %(message)s",
+        )
+
     # silence libs logging
     # - urllib3 - we don't care about those debug posts
     # - kubernetes - prints resources content when debug, causing secrets leak
@@ -111,7 +154,7 @@ def main() -> int:
     """Main function."""
     args = parse_args()
 
-    configure_logging(args.log_level)
+    configure_logging(args.log_level, args.rich_logs)
 
     logger.info("Starting Lightspeed to Dataverse exporter (mode: %s)", args.mode)
 
