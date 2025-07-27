@@ -190,6 +190,7 @@ class TestMain:
         mock_args.collection_interval = None
         mock_args.ingress_connection_timeout = None
         mock_args.no_cleanup = False
+        mock_args.rich_logs = False
         mock_parse_args.return_value = mock_args
 
         mock_settings = Mock()
@@ -211,7 +212,7 @@ class TestMain:
         result = main()
 
         assert result == 0
-        mock_configure_logging.assert_called_once_with("INFO")
+        mock_configure_logging.assert_called_once_with("INFO", mock_args.rich_logs)
         mock_from_yaml.assert_called_once_with(Path("/config.yaml"))
         mock_get_auth.assert_called_once_with(
             mode="openshift", auth_token=None, identity_id="config-identity"
@@ -239,6 +240,7 @@ class TestMain:
         mock_args.collection_interval = 600
         mock_args.ingress_connection_timeout = 60
         mock_args.no_cleanup = True
+        mock_args.rich_logs = False
         mock_parse_args.return_value = mock_args
 
         mock_get_auth.return_value = ("test-token", "test-identity")
@@ -249,7 +251,7 @@ class TestMain:
         result = main()
 
         assert result == 0
-        mock_configure_logging.assert_called_once_with("DEBUG")
+        mock_configure_logging.assert_called_once_with("DEBUG", mock_args.rich_logs)
         mock_get_auth.assert_called_once_with(
             mode="manual", auth_token="test-token", identity_id="test-identity"
         )
