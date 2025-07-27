@@ -1,6 +1,6 @@
 from pathlib import Path
 import yaml
-from pydantic import BaseModel, PositiveInt, DirectoryPath, ConfigDict
+from pydantic import BaseModel, PositiveInt, DirectoryPath, ConfigDict, Field
 from typing import Optional
 
 from src import constants
@@ -30,6 +30,7 @@ class DataCollectorSettings(BaseModel):
     ingress_connection_timeout: PositiveInt = (
         constants.DATA_COLLECTOR_CONNECTION_TIMEOUT
     )
+    allowed_subdirs: list[str] = Field(default_factory=list)
 
     @classmethod
     def from_yaml(cls, config_file: Path) -> "DataCollectorSettings":
