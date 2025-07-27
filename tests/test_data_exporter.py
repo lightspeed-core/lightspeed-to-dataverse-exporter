@@ -2,9 +2,8 @@
 
 import tempfile
 from pathlib import Path
-from unittest.mock import patch, Mock
+from unittest.mock import patch
 import io
-import pytest
 import requests
 import tarfile
 
@@ -45,92 +44,6 @@ class TestDataCollectorService:
             assert service.collection_interval == 60
             assert service.ingress_connection_timeout == 30
             assert service.cleanup_after_send is True
-
-    @patch("src.data_exporter.requests.Session")
-    def test_upload_data_to_ingress_success(self, mock_session_class):
-        """Test successful data upload to ingress server."""
-        # Setup mock response
-        mock_response = Mock()
-        mock_response.status_code = 202
-        mock_response.json.return_value = {"request_id": "test-123"}
-
-        mock_session = Mock()
-        mock_session.post.return_value = mock_response
-        mock_session_class.return_value.__enter__.return_value = mock_session
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            service = DataCollectorService(
-                data_dir=Path(tmpdir),
-                service_id="test-service",
-                ingress_server_url="https://example.com/api/v1/upload",
-                ingress_server_auth_token="test-token",
-                identity_id="test-identity",
-                collection_interval=60,
-                ingress_connection_timeout=30,
-                cleanup_after_send=True,
-            )
-
-            tarball = io.BytesIO(b"test data")
-            response = service._upload_data_to_ingress(tarball)
-
-            assert response.status_code == 202
-            mock_session.post.assert_called_once()
-
-    @patch("src.data_exporter.requests.Session")
-    def test_upload_tarball_success(self, mock_session_class):
-        """Test successful tarball upload."""
-        # Setup mock response
-        mock_response = Mock()
-        mock_response.status_code = 202
-        mock_response.json.return_value = {"request_id": "test-123"}
-
-        mock_session = Mock()
-        mock_session.post.return_value = mock_response
-        mock_session_class.return_value.__enter__.return_value = mock_session
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            service = DataCollectorService(
-                data_dir=Path(tmpdir),
-                service_id="test-service",
-                ingress_server_url="https://example.com/api/v1/upload",
-                ingress_server_auth_token="test-token",
-                identity_id="test-identity",
-                collection_interval=60,
-                ingress_connection_timeout=30,
-                cleanup_after_send=True,
-            )
-
-            tarball = io.BytesIO(b"test data")
-            # Should not raise an exception
-            service.upload_tarball(tarball)
-
-    @patch("src.data_exporter.requests.Session")
-    def test_upload_tarball_failure(self, mock_session_class):
-        """Test tarball upload failure handling."""
-        # Setup mock response for failure
-        mock_response = Mock()
-        mock_response.status_code = 500
-        mock_response.text = "Internal Server Error"
-
-        mock_session = Mock()
-        mock_session.post.return_value = mock_response
-        mock_session_class.return_value.__enter__.return_value = mock_session
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            service = DataCollectorService(
-                data_dir=Path(tmpdir),
-                service_id="test-service",
-                ingress_server_url="https://example.com/api/v1/upload",
-                ingress_server_auth_token="test-token",
-                identity_id="test-identity",
-                collection_interval=60,
-                ingress_connection_timeout=30,
-                cleanup_after_send=True,
-            )
-
-            tarball = io.BytesIO(b"test data")
-            with pytest.raises(requests.RequestException):
-                service.upload_tarball(tarball)
 
     def test_service_initialization(self):
         """Test DataCollectorService initialization with all parameters."""
@@ -348,7 +261,7 @@ class TestDataCollectorServiceRun:
                 cleanup_after_send=True,
             )
 
-            with patch.object(service, "upload_tarball"):
+            with patch.object(service.ingress_client, "upload_tarball"):
                 service.run()
 
             # Verify data processing workflow
@@ -396,7 +309,7 @@ class TestDataCollectorServiceRun:
                 cleanup_after_send=False,  # Cleanup disabled
             )
 
-            with patch.object(service, "upload_tarball"):
+            with patch.object(service.ingress_client, "upload_tarball"):
                 service.run()
 
             # Verify cleanup functions are not called
