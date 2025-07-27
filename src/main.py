@@ -13,6 +13,37 @@ from src import constants
 logger = logging.getLogger(__name__)
 
 
+def validate_required_config(config_dict: dict, mode: str) -> None:
+    """Validate that all required configuration is present.
+
+    Args:
+        config_dict: Dictionary containing configuration values
+        mode: Authentication mode (openshift or manual)
+
+    Raises:
+        SystemExit: If required configuration is missing
+    """
+    required_fields = ["data_dir", "service_id", "ingress_server_url"]
+    if mode == "manual":
+        required_fields.extend(["ingress_server_auth_token", "identity_id"])
+
+    missing_fields = [
+        field
+        for field in required_fields
+        if field not in config_dict or config_dict[field] is None
+    ]
+
+    if missing_fields:
+        logger.error(
+            "Missing required configuration: %s",
+            ", ".join(f"--{field.replace('_', '-')}" for field in missing_fields),
+        )
+        logger.error(
+            "Either provide --config with a YAML file or all required arguments"
+        )
+        sys.exit(1)
+
+
 def parse_args() -> argparse.Namespace:
     """Parse command line arguments with environment selection."""
     parser = argparse.ArgumentParser(
@@ -145,7 +176,7 @@ def configure_logging(log_level: str, use_rich: bool = False) -> None:
 
     # silence libs logging
     # - urllib3 - we don't care about those debug posts
-    # - kubernetes - prints resources content when debug, causing secrets leak
+    # - kubernetes - prints resources content when debug
     logging.getLogger("kubernetes").setLevel(logging.WARNING)
     logging.getLogger("urllib3").setLevel(logging.WARNING)
 
@@ -159,72 +190,63 @@ def main() -> int:
     logger.info("Starting Lightspeed to Dataverse exporter (mode: %s)", args.mode)
 
     try:
-        # Load settings from config file if provided
-        settings = None
+        # Load config as dict if provided
+        config_dict = {}
         if args.config:
             logger.info("Loading configuration from %s", args.config)
-            settings = DataCollectorSettings.from_yaml(args.config)
+            import yaml
 
-        # Check for required arguments when no config is provided
-        if not args.config:
-            required_args = ["data_dir", "service_id", "ingress_server_url"]
-            if args.mode == "manual":
-                required_args.append("ingress_server_auth_token")
-                required_args.append("identity_id")
+            with open(args.config, "r", encoding="utf-8") as f:
+                config_dict = yaml.safe_load(f) or {}
 
-            missing_args = [
-                arg
-                for arg in required_args
-                if getattr(args, arg.replace("-", "_")) is None
-            ]
-            if missing_args:
-                logger.error(
-                    "Missing required arguments: %s",
-                    ", ".join(f"--{arg}" for arg in missing_args),
-                )
-                logger.error(
-                    "Either provide --config with a YAML file or all required arguments"
-                )
-                return 1
+        # Apply CLI args to config dict (CLI args override config file values)
+        if args.data_dir:
+            config_dict["data_dir"] = args.data_dir
+        if args.service_id:
+            config_dict["service_id"] = args.service_id
+        if args.ingress_server_url:
+            config_dict["ingress_server_url"] = args.ingress_server_url
+        if args.ingress_server_auth_token:
+            config_dict["ingress_server_auth_token"] = args.ingress_server_auth_token
+        if args.identity_id:
+            config_dict["identity_id"] = args.identity_id
+        if args.collection_interval:
+            config_dict["collection_interval"] = args.collection_interval
+        if args.ingress_connection_timeout:
+            config_dict["ingress_connection_timeout"] = args.ingress_connection_timeout
+        if args.no_cleanup:
+            config_dict["cleanup_after_send"] = False
+        if args.allowed_subdirs:
+            config_dict["allowed_subdirs"] = args.allowed_subdirs
+
+        # Validate required configuration
+        validate_required_config(config_dict, args.mode)
 
         # Get authentication credentials based on mode
-        # Use CLI args first, fall back to config values
         auth_token, identity_id = get_auth_credentials(
             mode=args.mode,
             auth_token=args.ingress_server_auth_token
-            or (settings.ingress_server_auth_token if settings else None),
-            identity_id=args.identity_id
-            or (settings.identity_id if settings else None),
+            or config_dict.get("ingress_server_auth_token"),
+            identity_id=args.identity_id or config_dict.get("identity_id"),
         )
 
-        # Create and run service using CLI args with config fallbacks
-        service = DataCollectorService(
-            data_dir=args.data_dir or (settings.data_dir if settings else None),
-            service_id=args.service_id or (settings.service_id if settings else None),
-            ingress_server_url=args.ingress_server_url
-            or (settings.ingress_server_url if settings else None),
-            ingress_server_auth_token=auth_token,
-            identity_id=identity_id,
-            collection_interval=args.collection_interval
-            or (
-                settings.collection_interval
-                if settings
-                else constants.DATA_COLLECTOR_COLLECTION_INTERVAL
-            ),
-            ingress_connection_timeout=args.ingress_connection_timeout
-            or (
-                settings.ingress_connection_timeout
-                if settings
-                else constants.DATA_COLLECTOR_CONNECTION_TIMEOUT
-            ),
-            cleanup_after_send=(
-                False
-                if args.no_cleanup
-                else (settings.cleanup_after_send if settings else True)
-            ),
-            allowed_subdirs=args.allowed_subdirs
-            or (settings.allowed_subdirs if settings else []),
+        # Update config dict with resolved auth values
+        config_dict["ingress_server_auth_token"] = auth_token
+        config_dict["identity_id"] = identity_id
+
+        # Set defaults for optional fields
+        config_dict.setdefault(
+            "collection_interval", constants.DATA_COLLECTOR_COLLECTION_INTERVAL
         )
+        config_dict.setdefault(
+            "ingress_connection_timeout", constants.DATA_COLLECTOR_CONNECTION_TIMEOUT
+        )
+        config_dict.setdefault("cleanup_after_send", True)
+        config_dict.setdefault("allowed_subdirs", [])
+
+        # Create settings from merged config
+        config = DataCollectorSettings(**config_dict)
+        service = DataCollectorService(config)
 
         service.run()
 

@@ -374,7 +374,7 @@ class TestFileHandler:
         assert all(
             isinstance(path, Path) and isinstance(size, int) for path, size in result
         )
-        assert f"Collected 2 files from '{temp_data_dir}'" in caplog.text
+        assert f"Collected 2 files from {temp_data_dir}" in caplog.text
 
     def test_collect_files_removes_oversized(self, temp_data_dir, caplog):
         """Test that oversized files are removed."""

@@ -11,10 +11,35 @@ from src.data_exporter import (
     DataCollectorService,
     package_files_into_tarball,
 )
+from src.settings import DataCollectorSettings
 
 
 # Note: FilterAllowedFiles and CollectFiles tests moved to test_file_handler.py
 # since these functions are now part of the FileHandler class
+
+
+def create_test_config(**overrides) -> DataCollectorSettings:
+    """Create a DataCollectorSettings for testing with default values.
+
+    Args:
+        **overrides: Any configuration values to override
+
+    Returns:
+        DataCollectorSettings with test defaults
+    """
+    defaults = {
+        "data_dir": Path("/tmp/test"),
+        "service_id": "test-service",
+        "ingress_server_url": "https://example.com/api/v1/upload",
+        "ingress_server_auth_token": "test-token",
+        "identity_id": "test-identity",
+        "collection_interval": 60,
+        "ingress_connection_timeout": 30,
+        "cleanup_after_send": True,
+        "allowed_subdirs": [],
+    }
+    defaults.update(overrides)
+    return DataCollectorSettings(**defaults)
 
 
 class TestDataCollectorService:
@@ -24,69 +49,60 @@ class TestDataCollectorService:
         """Test that service initializes correctly with all required parameters."""
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            service = DataCollectorService(
-                data_dir=Path(tmpdir),
-                service_id="test-service",
-                ingress_server_url="https://example.com/api/v1/upload",
-                ingress_server_auth_token="test-token",
-                identity_id="test-identity",
-                collection_interval=60,
-                ingress_connection_timeout=30,
-                cleanup_after_send=True,
-            )
+            config = create_test_config(data_dir=Path(tmpdir))
+            service = DataCollectorService(config)
 
             # Test that service attributes are set correctly
             assert service.data_dir == Path(tmpdir)
-            assert service.service_id == "test-service"
-            assert service.ingress_server_url == "https://example.com/api/v1/upload"
-            assert service.ingress_server_auth_token == "test-token"
-            assert service.identity_id == "test-identity"
             assert service.collection_interval == 60
-            assert service.ingress_connection_timeout == 30
             assert service.cleanup_after_send is True
+
+            # Test that config is set correctly
+            assert service.config.service_id == "test-service"
+            assert (
+                service.config.ingress_server_url == "https://example.com/api/v1/upload"
+            )
+            assert service.config.ingress_server_auth_token == "test-token"
+            assert service.config.identity_id == "test-identity"
+            assert service.config.ingress_connection_timeout == 30
 
     def test_service_initialization(self):
         """Test DataCollectorService initialization with all parameters."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            service = DataCollectorService(
+            config = create_test_config(
                 data_dir=Path(tmpdir),
-                service_id="test-service",
-                ingress_server_url="https://example.com/api/v1/upload",
-                ingress_server_auth_token="test-token",
                 identity_id="cluster-123",
-                collection_interval=60,
-                ingress_connection_timeout=30,
-                cleanup_after_send=True,
             )
+            service = DataCollectorService(config)
 
             # Verify all attributes are set correctly
             assert service.data_dir == Path(tmpdir)
-            assert service.service_id == "test-service"
-            assert service.ingress_server_url == "https://example.com/api/v1/upload"
-            assert service.ingress_server_auth_token == "test-token"
-            assert service.identity_id == "cluster-123"
             assert service.collection_interval == 60
-            assert service.ingress_connection_timeout == 30
             assert service.cleanup_after_send is True
+            assert service.config.service_id == "test-service"
+            assert (
+                service.config.ingress_server_url == "https://example.com/api/v1/upload"
+            )
+            assert service.config.ingress_server_auth_token == "test-token"
+            assert service.config.identity_id == "cluster-123"
+            assert service.config.ingress_connection_timeout == 30
 
     def test_service_initialization_with_different_params(self):
         """Test DataCollectorService initialization with different parameters."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            service = DataCollectorService(
+            config = create_test_config(
                 data_dir=Path(tmpdir),
                 service_id="my-service",
-                ingress_server_url="https://example.com/api/v1/upload",
-                ingress_server_auth_token="test-token",
-                identity_id="test-identity",
                 collection_interval=120,
                 ingress_connection_timeout=60,
                 cleanup_after_send=False,
             )
+            service = DataCollectorService(config)
 
             # Verify different parameter values
-            assert service.service_id == "my-service"
+            assert service.config.service_id == "my-service"
             assert service.collection_interval == 120
-            assert service.ingress_connection_timeout == 60
+            assert service.config.ingress_connection_timeout == 60
             assert service.cleanup_after_send is False
 
     def test_service_initialization_with_custom_allowed_subdirs(self):
@@ -94,20 +110,14 @@ class TestDataCollectorService:
         custom_subdirs = ["logs", "metrics", "traces"]
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            service = DataCollectorService(
+            config = create_test_config(
                 data_dir=Path(tmpdir),
-                service_id="test-service",
-                ingress_server_url="https://example.com/api/v1/upload",
-                ingress_server_auth_token="test-token",
-                identity_id="test-identity",
-                collection_interval=60,
-                ingress_connection_timeout=30,
-                cleanup_after_send=True,
                 allowed_subdirs=custom_subdirs,
             )
+            service = DataCollectorService(config)
 
             # Verify allowed_subdirs is set correctly
-            assert service.allowed_subdirs == custom_subdirs
+            assert service.config.allowed_subdirs == custom_subdirs
             # Verify file_handler gets the custom subdirs
             assert service.file_handler.allowed_subdirs == custom_subdirs
 
@@ -207,16 +217,8 @@ class TestDataCollectorServiceRun:
         mock_sleep.side_effect = KeyboardInterrupt()
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            service = DataCollectorService(
-                data_dir=Path(tmpdir),
-                service_id="test-service",
-                ingress_server_url="https://example.com/api/v1/upload",
-                ingress_server_auth_token="test-token",
-                identity_id="test-identity",
-                collection_interval=60,
-                ingress_connection_timeout=30,
-                cleanup_after_send=True,
-            )
+            config = create_test_config(data_dir=Path(tmpdir))
+            service = DataCollectorService(config)
 
             service.run()
 
@@ -250,16 +252,8 @@ class TestDataCollectorServiceRun:
         mock_sleep.side_effect = KeyboardInterrupt()
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            service = DataCollectorService(
-                data_dir=Path(tmpdir),
-                service_id="test-service",
-                ingress_server_url="https://example.com/api/v1/upload",
-                ingress_server_auth_token="test-token",
-                identity_id="test-identity",
-                collection_interval=60,
-                ingress_connection_timeout=30,
-                cleanup_after_send=True,
-            )
+            config = create_test_config(data_dir=Path(tmpdir))
+            service = DataCollectorService(config)
 
             with patch.object(service.ingress_client, "upload_tarball"):
                 service.run()
@@ -298,16 +292,8 @@ class TestDataCollectorServiceRun:
         mock_sleep.side_effect = KeyboardInterrupt()
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            service = DataCollectorService(
-                data_dir=Path(tmpdir),
-                service_id="test-service",
-                ingress_server_url="https://example.com/api/v1/upload",
-                ingress_server_auth_token="test-token",
-                identity_id="test-identity",
-                collection_interval=60,
-                ingress_connection_timeout=30,
-                cleanup_after_send=False,  # Cleanup disabled
-            )
+            config = create_test_config(data_dir=Path(tmpdir), cleanup_after_send=False)
+            service = DataCollectorService(config)
 
             with patch.object(service.ingress_client, "upload_tarball"):
                 service.run()
@@ -325,16 +311,8 @@ class TestDataCollectorServiceRun:
         mock_collect.side_effect = [OSError("File system error"), KeyboardInterrupt()]
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            service = DataCollectorService(
-                data_dir=Path(tmpdir),
-                service_id="test-service",
-                ingress_server_url="https://example.com/api/v1/upload",
-                ingress_server_auth_token="test-token",
-                identity_id="test-identity",
-                collection_interval=60,
-                ingress_connection_timeout=30,
-                cleanup_after_send=True,
-            )
+            config = create_test_config(data_dir=Path(tmpdir))
+            service = DataCollectorService(config)
 
             service.run()
 
@@ -355,16 +333,8 @@ class TestDataCollectorServiceRun:
         ]
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            service = DataCollectorService(
-                data_dir=Path(tmpdir),
-                service_id="test-service",
-                ingress_server_url="https://example.com/api/v1/upload",
-                ingress_server_auth_token="test-token",
-                identity_id="test-identity",
-                collection_interval=60,
-                ingress_connection_timeout=30,
-                cleanup_after_send=True,
-            )
+            config = create_test_config(data_dir=Path(tmpdir))
+            service = DataCollectorService(config)
 
             service.run()
 
