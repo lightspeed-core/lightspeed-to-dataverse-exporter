@@ -2,9 +2,10 @@
 
 import pytest
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, patch, mock_open
 
 from src.main import parse_args, main, configure_logging
+from src.settings import DataCollectorSettings
 
 
 class TestParseArgs:
@@ -165,14 +166,18 @@ class TestMain:
 
     @patch("src.main.parse_args")
     @patch("src.main.configure_logging")
-    @patch("src.main.DataCollectorSettings.from_yaml")
+    @patch(
+        "builtins.open",
+        new_callable=mock_open,
+        read_data="data_dir: /tmp\nservice_id: config-service\ningress_server_url: https://config.example.com\nidentity_id: config-identity\ncollection_interval: 300\ningress_connection_timeout: 30\ncleanup_after_send: true",
+    )
     @patch("src.main.get_auth_credentials")
     @patch("src.main.DataCollectorService")
     def test_main_with_config_file_openshift_mode(
         self,
         mock_service_class,
         mock_get_auth,
-        mock_from_yaml,
+        mock_open_file,
         mock_configure_logging,
         mock_parse_args,
     ):
@@ -191,18 +196,8 @@ class TestMain:
         mock_args.ingress_connection_timeout = None
         mock_args.no_cleanup = False
         mock_args.rich_logs = False
+        mock_args.allowed_subdirs = None
         mock_parse_args.return_value = mock_args
-
-        mock_settings = Mock()
-        mock_settings.data_dir = Path("/data")
-        mock_settings.service_id = "config-service"
-        mock_settings.ingress_server_url = "https://config.example.com"
-        mock_settings.ingress_server_auth_token = None
-        mock_settings.identity_id = "config-identity"
-        mock_settings.collection_interval = 300
-        mock_settings.ingress_connection_timeout = 30
-        mock_settings.cleanup_after_send = True
-        mock_from_yaml.return_value = mock_settings
 
         mock_get_auth.return_value = ("openshift-token", "openshift-identity")
 
@@ -213,11 +208,21 @@ class TestMain:
 
         assert result == 0
         mock_configure_logging.assert_called_once_with("INFO", mock_args.rich_logs)
-        mock_from_yaml.assert_called_once_with(Path("/config.yaml"))
+        mock_open_file.assert_called_once_with(
+            Path("/config.yaml"), "r", encoding="utf-8"
+        )
         mock_get_auth.assert_called_once_with(
             mode="openshift", auth_token=None, identity_id="config-identity"
         )
         mock_service.run.assert_called_once()
+
+        # Verify DataCollectorService was called with DataCollectorSettings
+        mock_service_class.assert_called_once()
+        created_settings = mock_service_class.call_args[0][0]
+        assert isinstance(created_settings, DataCollectorSettings)
+        assert created_settings.data_dir == Path("/tmp")
+        assert created_settings.service_id == "config-service"
+        assert created_settings.ingress_server_url == "https://config.example.com"
 
     @patch("src.main.parse_args")
     @patch("src.main.configure_logging")
@@ -232,7 +237,7 @@ class TestMain:
         mock_args.mode = "manual"
         mock_args.config = None
         mock_args.log_level = "DEBUG"
-        mock_args.data_dir = Path("/test-data")
+        mock_args.data_dir = Path("/tmp")
         mock_args.service_id = "test-service"
         mock_args.ingress_server_url = "https://test.example.com"
         mock_args.ingress_server_auth_token = "test-token"
@@ -241,6 +246,7 @@ class TestMain:
         mock_args.ingress_connection_timeout = 60
         mock_args.no_cleanup = True
         mock_args.rich_logs = False
+        mock_args.allowed_subdirs = None
         mock_parse_args.return_value = mock_args
 
         mock_get_auth.return_value = ("test-token", "test-identity")
@@ -251,6 +257,11 @@ class TestMain:
         result = main()
 
         assert result == 0
+
+        # Verify DataCollectorService was called with proper config
+        mock_service_class.assert_called_once()
+        created_settings = mock_service_class.call_args[0][0]
+        assert isinstance(created_settings, DataCollectorSettings)
         mock_configure_logging.assert_called_once_with("DEBUG", mock_args.rich_logs)
         mock_get_auth.assert_called_once_with(
             mode="manual", auth_token="test-token", identity_id="test-identity"
@@ -272,11 +283,17 @@ class TestMain:
         mock_args.ingress_server_url = "https://test.example.com"
         mock_args.ingress_server_auth_token = "test-token"
         mock_args.identity_id = "test-identity"
+        mock_args.collection_interval = None
+        mock_args.ingress_connection_timeout = None
+        mock_args.no_cleanup = False
+        mock_args.rich_logs = False
+        mock_args.allowed_subdirs = None
         mock_parse_args.return_value = mock_args
 
-        result = main()
+        with pytest.raises(SystemExit) as exc_info:
+            main()
 
-        assert result == 1  # Error exit code
+        assert exc_info.value.code == 1
 
     @patch("src.main.parse_args")
     @patch("src.main.configure_logging")
@@ -289,11 +306,16 @@ class TestMain:
         mock_args.mode = "openshift"
         mock_args.config = None
         mock_args.log_level = "INFO"
-        mock_args.data_dir = Path("/test-data")
+        mock_args.data_dir = Path("/tmp")
         mock_args.service_id = "test-service"
         mock_args.ingress_server_url = "https://test.example.com"
         mock_args.ingress_server_auth_token = None
         mock_args.identity_id = None
+        mock_args.collection_interval = None
+        mock_args.ingress_connection_timeout = None
+        mock_args.no_cleanup = False
+        mock_args.rich_logs = False
+        mock_args.allowed_subdirs = None
         mock_parse_args.return_value = mock_args
 
         from src.auth import AuthenticationError
@@ -316,7 +338,7 @@ class TestMain:
         mock_args.mode = "manual"
         mock_args.config = None
         mock_args.log_level = "INFO"
-        mock_args.data_dir = Path("/test-data")
+        mock_args.data_dir = Path("/tmp")
         mock_args.service_id = "test-service"
         mock_args.ingress_server_url = "https://test.example.com"
         mock_args.ingress_server_auth_token = "test-token"
@@ -324,6 +346,8 @@ class TestMain:
         mock_args.collection_interval = None
         mock_args.ingress_connection_timeout = None
         mock_args.no_cleanup = False
+        mock_args.rich_logs = False
+        mock_args.allowed_subdirs = None
         mock_parse_args.return_value = mock_args
 
         mock_get_auth.return_value = ("test-token", "test-identity")
@@ -348,7 +372,7 @@ class TestMain:
         mock_args.mode = "manual"
         mock_args.config = None
         mock_args.log_level = "INFO"
-        mock_args.data_dir = Path("/test-data")
+        mock_args.data_dir = Path("/tmp")
         mock_args.service_id = "test-service"
         mock_args.ingress_server_url = "https://test.example.com"
         mock_args.ingress_server_auth_token = "test-token"
@@ -356,6 +380,8 @@ class TestMain:
         mock_args.collection_interval = None
         mock_args.ingress_connection_timeout = None
         mock_args.no_cleanup = False
+        mock_args.rich_logs = False
+        mock_args.allowed_subdirs = None
         mock_parse_args.return_value = mock_args
 
         mock_get_auth.return_value = ("test-token", "test-identity")

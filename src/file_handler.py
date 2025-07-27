@@ -138,7 +138,7 @@ class FileHandler:
         # Filter by allowed subdirectories
         all_files = self.filter_allowed_files(all_files)
 
-        logger.debug("Collected %d files from '%s'", len(all_files), self.data_dir)
+        logger.debug("Collected %d files from %s", len(all_files), self.data_dir)
 
         if not all_files:
             return []

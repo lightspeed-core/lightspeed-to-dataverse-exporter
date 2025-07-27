@@ -18,6 +18,7 @@ import requests
 from src.constants import DATA_COLLECTOR_RETRY_INTERVAL
 from src.file_handler import FileHandler
 from src.ingress_client import IngressClient
+from src.settings import DataCollectorSettings
 
 logger = logging.getLogger(__name__)
 
@@ -58,39 +59,31 @@ class DataCollectorService:
     including feedback and transcripts to the configured ingress server.
     """
 
-    def __init__(
-        self,
-        data_dir: Path,
-        collection_interval: int,
-        ingress_server_url: str,
-        ingress_server_auth_token: str,
-        service_id: str,
-        identity_id: str,
-        ingress_connection_timeout: int,
-        cleanup_after_send: bool,
-        allowed_subdirs: list[str] | None = None,
-    ) -> None:
-        """Initialize the data collector service."""
-        self.data_dir = data_dir
-        self.collection_interval = collection_interval
-        self.ingress_server_url = ingress_server_url
-        self.ingress_server_auth_token = ingress_server_auth_token
-        self.service_id = service_id
-        self.identity_id = identity_id
-        self.ingress_connection_timeout = ingress_connection_timeout
-        self.cleanup_after_send = cleanup_after_send
-        self.allowed_subdirs = allowed_subdirs or []
+    def __init__(self, config: DataCollectorSettings) -> None:
+        """Initialize the data collector service.
+
+        Args:
+            config: Configuration settings containing all service parameters
+        """
+        self.config = config
+
+        # Store frequently accessed config values as instance attributes for convenience
+        self.data_dir = config.data_dir
+        self.collection_interval = config.collection_interval
+        self.cleanup_after_send = config.cleanup_after_send
 
         # Initialize file handler for this service
-        self.file_handler = FileHandler(data_dir, allowed_subdirs=allowed_subdirs)
+        self.file_handler = FileHandler(
+            config.data_dir, allowed_subdirs=config.allowed_subdirs
+        )
 
         # Initialize ingress client for uploads
         self.ingress_client = IngressClient(
-            ingress_server_url=ingress_server_url,
-            ingress_server_auth_token=ingress_server_auth_token,
-            service_id=service_id,
-            identity_id=identity_id,
-            connection_timeout=ingress_connection_timeout,
+            ingress_server_url=config.ingress_server_url,
+            ingress_server_auth_token=config.ingress_server_auth_token,
+            service_id=config.service_id,
+            identity_id=config.identity_id,
+            connection_timeout=config.ingress_connection_timeout,
         )
 
     def _process_data_collection(self) -> None:
