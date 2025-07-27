@@ -15,13 +15,9 @@ import logging
 import time
 import requests
 
-from src.constants import (
-    TARBALL_FILENAME,
-    CONTENT_TYPE,
-    USER_AGENT,
-    DATA_COLLECTOR_RETRY_INTERVAL,
-)
+from src.constants import DATA_COLLECTOR_RETRY_INTERVAL
 from src.file_handler import FileHandler
+from src.ingress_client import IngressClient
 
 logger = logging.getLogger(__name__)
 
@@ -88,64 +84,14 @@ class DataCollectorService:
         # Initialize file handler for this service
         self.file_handler = FileHandler(data_dir, allowed_subdirs=allowed_subdirs)
 
-    def _upload_data_to_ingress(self, tarball: io.BytesIO) -> requests.Response:
-        """Upload the tarball to a Ingress.
-
-        Args:
-            tarball: BytesIO object representing the tarball to be uploaded.
-
-        Returns:
-            Response object from the Ingress.
-        """
-        logger.info("Sending collected data")
-        payload = {
-            "file": (
-                TARBALL_FILENAME,
-                tarball.read(),
-                CONTENT_TYPE.format(service_id=self.service_id),
-            ),
-        }
-
-        headers: dict[str, str | bytes]
-        headers = {
-            "User-Agent": USER_AGENT.format(identity_id=self.identity_id),
-            "Authorization": f"Bearer {self.ingress_server_auth_token}",
-        }
-
-        with requests.Session() as s:
-            s.headers = headers
-            logger.debug("Posting payload to %s", self.ingress_server_url)
-            response = s.post(
-                url=self.ingress_server_url,
-                files=payload,
-                timeout=self.ingress_connection_timeout,
-            )
-
-        return response
-
-    def upload_tarball(self, tarball: io.BytesIO) -> None:
-        """Upload the tarball to a Ingress.
-
-        Args:
-            tarball: BytesIO object representing the tarball to be uploaded.
-        """
-        response = self._upload_data_to_ingress(tarball)
-        if response.status_code != 202:
-            logger.error(
-                "Posting payload failed, response: %d: %s",
-                response.status_code,
-                response.text,
-            )
-            raise requests.RequestException(
-                f"Data upload failed with response code: {response.status_code}"
-                f" and text: {response.text}",
-            )
-
-        request_id = response.json()["request_id"]
-        logger.info("Data uploaded with request_id: '%s'", request_id)
-
-        # close the tarball to release memory
-        tarball.close()
+        # Initialize ingress client for uploads
+        self.ingress_client = IngressClient(
+            ingress_server_url=ingress_server_url,
+            ingress_server_auth_token=ingress_server_auth_token,
+            service_id=service_id,
+            identity_id=identity_id,
+            connection_timeout=ingress_connection_timeout,
+        )
 
     def run(self) -> None:
         """Run the periodic data collection loop."""
@@ -165,7 +111,7 @@ class DataCollectorService:
                             data_chunk, path_to_strip=self.data_dir.as_posix()
                         )
                         logger.debug("Successfully packed data chunk into tarball")
-                        self.upload_tarball(tarball)
+                        self.ingress_client.upload_tarball(tarball)
                         if self.cleanup_after_send:
                             self.file_handler.delete_collected_files(data_chunk)
                     if self.cleanup_after_send:
