@@ -70,6 +70,7 @@ uv run python -m src.main --mode manual --config config.yaml \
   --identity-id YOUR_IDENTITY
 ```
 - Requires explicit credentials
+- The auth token can either be specified as a command arg as above or via the envvar `INGRESS_SERVER_AUTH_TOKEN`.
 - Use `scripts/ingress_token_from_offline_token.py` to generate tokens for stage testing
 
 ### Common Options

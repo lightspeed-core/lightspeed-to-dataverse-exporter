@@ -84,6 +84,7 @@ If testing against the stage environment, generate an ingress auth token from yo
 # Get your offline token from https://access.stage.redhat.com/management/api
 # Then generate the ingress auth token:
 python scripts/ingress_token_from_offline_token.py --offline-token YOUR_OFFLINE_TOKEN --env stage
+export INGRESS_SERVER_AUTH_TOKEN="your-auth-token"
 ```
 
 **Create test configuration:**
@@ -92,7 +93,6 @@ cat > test-config.yaml << 'EOF'
 data_dir: "./test-data"
 service_id: "your-service-id"
 ingress_server_url: "https://your-stage-ingress-url/api/v1/data/ingest"  # use staging for testing
-ingress_server_auth_token: "your-auth-token"  # use token from script above
 identity_id: "test-instance"
 collection_interval: 60
 cleanup_after_send: false
