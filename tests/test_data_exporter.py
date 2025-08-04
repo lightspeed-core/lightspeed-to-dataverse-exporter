@@ -227,6 +227,22 @@ class TestDataCollectorServiceRun:
 
     @patch("src.file_handler.FileHandler.collect_files")
     @patch("src.file_handler.FileHandler.gather_data_chunks")
+    def test_run_single_shot_mode(self, mock_gather, mock_collect):
+        """Test run method when no data is found."""
+        mock_collect.return_value = []
+        mock_gather.return_value = []
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config = create_test_config(data_dir=Path(tmpdir), collection_interval=0)
+            service = DataCollectorService(config)
+
+            service.run()
+
+            mock_collect.assert_called()
+            mock_gather.assert_called_with([])
+
+    @patch("src.file_handler.FileHandler.collect_files")
+    @patch("src.file_handler.FileHandler.gather_data_chunks")
     @patch("src.data_exporter.package_files_into_tarball")
     @patch("src.file_handler.FileHandler.delete_collected_files")
     @patch("src.file_handler.FileHandler.ensure_size_limit")
@@ -345,3 +361,24 @@ class TestDataCollectorServiceRun:
 
             # Should sleep with retry interval after exception
             mock_sleep.assert_called()
+
+    @patch("src.file_handler.FileHandler.collect_files")
+    def test_run_handles_request_exception_in_single_shot_mode(self, mock_collect):
+        """Test run method handles RequestException gracefully."""
+        # Mock to raise RequestException first, then KeyboardInterrupt to exit
+        mock_collect.side_effect = [
+            requests.RequestException("Network error"),
+        ]
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config = create_test_config(data_dir=Path(tmpdir), collection_interval=0)
+            service = DataCollectorService(config)
+
+            try:
+                service.run()
+            except requests.RequestException:
+                pass
+            else:
+                assert (
+                    False
+                ), "service should have reraised exception when in single shot mode"

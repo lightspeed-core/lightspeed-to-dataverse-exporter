@@ -74,6 +74,16 @@ class TestDataCollectorSettings:
 
             assert "greater_than" in str(exc_info.value)
 
+    def test_zero_collection_interval(self):
+        """Test validation error for negative collection interval."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            DataCollectorSettings(
+                data_dir=Path(tmpdir),
+                service_id="test-service",
+                ingress_server_url="https://example.com/api/v1/upload",
+                collection_interval=0,
+            )
+
     def test_from_yaml_valid_file(self):
         """Test loading settings from a valid YAML file."""
         config_data = {
