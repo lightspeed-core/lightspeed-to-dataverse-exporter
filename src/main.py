@@ -3,6 +3,7 @@
 
 import argparse
 import logging
+import signal
 import sys
 from os import environ
 from pathlib import Path
@@ -252,6 +253,8 @@ def main() -> int:
         # Create settings from merged config
         config = DataCollectorSettings(**config_dict)
         service = DataCollectorService(config)
+
+        _ = signal.signal(signal.SIGTERM, lambda _, _2: service.shutdown())
 
         service.run()
 
