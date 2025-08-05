@@ -393,3 +393,125 @@ class TestMain:
         result = main()
 
         assert result == 1  # Error exit code
+
+    def _create_minimal_args(self, **overrides):
+        """Helper to create minimal mock args with only required fields and test-specific overrides."""
+        mock_args = Mock()
+        # Required fields for manual mode
+        mock_args.mode = "manual"
+        mock_args.config = None
+        mock_args.log_level = "INFO"
+        mock_args.data_dir = Path("/tmp")
+        mock_args.service_id = "test-service"
+        mock_args.ingress_server_url = "https://test.example.com"
+        mock_args.identity_id = "test-identity"
+        # Minimal optional fields
+        mock_args.ingress_server_auth_token = None
+        mock_args.collection_interval = None
+        mock_args.ingress_connection_timeout = None
+        mock_args.no_cleanup = False
+        mock_args.rich_logs = False
+        mock_args.allowed_subdirs = None
+
+        # Apply any test-specific overrides
+        for key, value in overrides.items():
+            setattr(mock_args, key, value)
+
+        return mock_args
+
+    @patch("src.main.parse_args")
+    @patch("src.main.configure_logging")
+    @patch("src.main.DataCollectorSettings")
+    @patch("src.main.DataCollectorService")
+    @patch.dict("os.environ", {"INGRESS_SERVER_AUTH_TOKEN": "env-token"})
+    def test_main_ingress_token_precedence_cli_over_env(
+        self,
+        mock_service_class,
+        mock_settings_class,
+        mock_configure_logging,
+        mock_parse_args,
+    ):
+        """Test that CLI arg takes precedence over environment variable for auth token."""
+        mock_args = self._create_minimal_args(ingress_server_auth_token="cli-token")
+        mock_parse_args.return_value = mock_args
+
+        mock_service = Mock()
+        mock_service_class.return_value = mock_service
+
+        result = main()
+
+        assert result == 0
+
+        # Verify CLI token was passed to DataCollectorSettings, not env token
+        mock_settings_class.assert_called_once()
+        call_kwargs = mock_settings_class.call_args[1]
+        assert call_kwargs["ingress_server_auth_token"] == "cli-token"
+
+    @patch("src.main.parse_args")
+    @patch("src.main.configure_logging")
+    @patch("src.main.DataCollectorSettings")
+    @patch("src.main.DataCollectorService")
+    @patch.dict("os.environ", {"INGRESS_SERVER_AUTH_TOKEN": "env-token"})
+    def test_main_ingress_token_precedence_env_fallback(
+        self,
+        mock_service_class,
+        mock_settings_class,
+        mock_configure_logging,
+        mock_parse_args,
+    ):
+        """Test that environment variable is used when CLI arg not provided."""
+        mock_args = (
+            self._create_minimal_args()
+        )  # ingress_server_auth_token defaults to None
+        mock_parse_args.return_value = mock_args
+
+        mock_service = Mock()
+        mock_service_class.return_value = mock_service
+
+        result = main()
+
+        assert result == 0
+
+        # Verify env token was passed to DataCollectorSettings
+        mock_settings_class.assert_called_once()
+        call_kwargs = mock_settings_class.call_args[1]
+        assert call_kwargs["ingress_server_auth_token"] == "env-token"
+
+    @patch("src.main.parse_args")
+    @patch("src.main.configure_logging")
+    @patch(
+        "builtins.open",
+        new_callable=mock_open,
+        read_data="data_dir: /tmp\nservice_id: config-service\ningress_server_url: https://config.example.com\ningress_server_auth_token: config-token\nidentity_id: config-identity\ncollection_interval: 300",
+    )
+    @patch("src.main.DataCollectorSettings")
+    @patch("src.main.DataCollectorService")
+    @patch.dict("os.environ", {"INGRESS_SERVER_AUTH_TOKEN": "env-token"})
+    def test_main_ingress_token_precedence_env_over_config(
+        self,
+        mock_service_class,
+        mock_settings_class,
+        mock_open_file,
+        mock_configure_logging,
+        mock_parse_args,
+    ):
+        """Test that environment variable takes precedence over config file."""
+        mock_args = self._create_minimal_args(
+            config=Path("/config.yaml"),
+            data_dir=None,  # Let config provide this
+            service_id=None,  # Let config provide this
+            ingress_server_url=None,  # Let config provide this
+        )
+        mock_parse_args.return_value = mock_args
+
+        mock_service = Mock()
+        mock_service_class.return_value = mock_service
+
+        result = main()
+
+        assert result == 0
+
+        # Verify env token was passed to DataCollectorSettings, not config token
+        mock_settings_class.assert_called_once()
+        call_kwargs = mock_settings_class.call_args[1]
+        assert call_kwargs["ingress_server_auth_token"] == "env-token"
