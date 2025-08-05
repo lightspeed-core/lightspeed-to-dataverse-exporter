@@ -4,6 +4,7 @@
 import argparse
 import logging
 import sys
+from os import environ
 from pathlib import Path
 from src.settings import DataCollectorSettings
 from src.data_exporter import DataCollectorService
@@ -208,6 +209,10 @@ def main() -> int:
             config_dict["ingress_server_url"] = args.ingress_server_url
         if args.ingress_server_auth_token:
             config_dict["ingress_server_auth_token"] = args.ingress_server_auth_token
+        elif "INGRESS_SERVER_AUTH_TOKEN" in environ:
+            config_dict["ingress_server_auth_token"] = environ[
+                "INGRESS_SERVER_AUTH_TOKEN"
+            ]
         if args.identity_id:
             config_dict["identity_id"] = args.identity_id
         if args.collection_interval:
