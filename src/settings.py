@@ -1,6 +1,13 @@
 from pathlib import Path
 import yaml
-from pydantic import BaseModel, PositiveInt, DirectoryPath, ConfigDict, Field
+from pydantic import (
+    BaseModel,
+    NonNegativeInt,
+    PositiveInt,
+    DirectoryPath,
+    ConfigDict,
+    Field,
+)
 from typing import Optional
 
 from src import constants
@@ -25,7 +32,7 @@ class DataCollectorSettings(BaseModel):
 
     # Optional settings with defaults
     identity_id: str = "unknown"
-    collection_interval: PositiveInt = constants.DATA_COLLECTOR_COLLECTION_INTERVAL
+    collection_interval: NonNegativeInt = constants.DATA_COLLECTOR_COLLECTION_INTERVAL
     cleanup_after_send: bool = True
     ingress_connection_timeout: PositiveInt = (
         constants.DATA_COLLECTOR_CONNECTION_TIMEOUT

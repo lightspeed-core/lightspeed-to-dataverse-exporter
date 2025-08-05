@@ -133,9 +133,17 @@ class DataCollectorService:
         """Run the periodic data collection loop."""
         logger.info("Starting data collection service")
 
+        in_single_shot_mode = not self.collection_interval
+        if in_single_shot_mode:
+            logger.info("Collection interval is not set, operating in single-shot mode")
+
         while True:
             try:
                 self._process_data_collection()
+
+                if in_single_shot_mode:
+                    return
+
                 logger.info(
                     "Waiting %d seconds before next collection",
                     self.collection_interval,
@@ -146,5 +154,12 @@ class DataCollectorService:
                 break
             except (OSError, requests.RequestException) as e:
                 logger.error("Error during collection process: %s", e, exc_info=True)
+
+                if in_single_shot_mode:
+                    # Let the exception cause the service to quit with a non-zero exit code. This
+                    # will indicate to the external job runner that the run failed and it can choose
+                    # whatever retry policy it wants.
+                    raise e
+
                 logger.info("Retrying in %d seconds...", self.collection_interval)
                 time.sleep(DATA_COLLECTOR_RETRY_INTERVAL)
