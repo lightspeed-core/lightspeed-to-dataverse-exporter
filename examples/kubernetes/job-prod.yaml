@@ -31,7 +31,7 @@ spec:
         - "--log-level"
         - "INFO"
         - "--collection-interval"
-        - "7200"  # Production interval (2 hours)
+        - "0"  # Single-shot mode: exit after one collection cycle
         volumeMounts:
         - name: config
           mountPath: /etc/config

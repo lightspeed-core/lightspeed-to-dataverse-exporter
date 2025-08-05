@@ -1,6 +1,6 @@
 # OpenShift Deployment Examples
 
-This directory contains Kubernetes/OpenShift manifests and scripts for deploying the Lightspeed to Dataverse exporter in a cluster.
+This directory contains Kubernetes/OpenShift manifests and scripts for deploying the Lightspeed to Dataverse exporter as Jobs in a cluster. The provided manifests are designed for single-shot mode execution, ideal for periodic data collection via CronJobs.
 
 ## Prerequisites
 
@@ -46,6 +46,28 @@ to obtain the auth token you can set in the `configmap-stage.yaml`.
 
 ```bash
 make deploy-stage
+```
+
+This deploys a Kubernetes Job that runs once in single-shot mode and exits (configured with `collection_interval: 0`).
+
+> **Note**: For continuous mode deployments (daemon-style), you would need to create a Deployment manifest with `collection_interval` set to a positive number. The provided examples focus on single-shot mode which is more efficient for periodic data collection in Kubernetes environments.
+
+### Creating a CronJob for Periodic Execution
+
+To run the job on a schedule, create a CronJob manifest:
+
+```yaml
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: lightspeed-exporter-cron
+  namespace: lsdv-exporter
+spec:
+  schedule: "0 */2 * * *"  # Every 2 hours
+  jobTemplate:
+    spec:
+      template:
+        # Use the same spec as job-stage.yaml
 ```
 
 ## RBAC Permissions
