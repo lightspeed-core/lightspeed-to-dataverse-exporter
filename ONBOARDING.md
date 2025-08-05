@@ -84,7 +84,7 @@ If testing against the stage environment, generate an ingress auth token from yo
 # Get your offline token from https://access.stage.redhat.com/management/api
 # Then generate the ingress auth token:
 python scripts/ingress_token_from_offline_token.py --offline-token YOUR_OFFLINE_TOKEN --env stage
-export INGRESS_SERVER_AUTH_TOKEN="your-auth-token"
+export INGRESS_SERVER_AUTH_TOKEN="<use-the-token-from-above-command>"
 ```
 
 **Create test configuration:**
