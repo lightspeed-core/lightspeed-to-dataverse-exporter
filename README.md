@@ -24,7 +24,7 @@ Create a `config.yaml` file. See example: [config.yaml.example](config.yaml.exam
 data_dir: "/path/to/data"
 service_id: "your-service-id"
 ingress_server_url: "https://console.redhat.com/api/ingress/v1/upload"
-collection_interval: 3600  # 1 hour
+collection_interval: 3600  # 1 hour (set to 0 for single-shot mode)
 cleanup_after_send: true
 ```
 
@@ -53,6 +53,23 @@ uv run python -m src.main \
 
 ### Usage
 
+The service supports two authentication modes and two execution modes:
+
+## Execution Modes
+
+**Continuous Mode** (default):
+- Runs indefinitely, collecting data at regular intervals
+- Set `collection_interval` to a positive number of seconds
+- Suitable for daemon-style deployments
+
+**Single-Shot Mode**:
+- Performs one data collection cycle and exits
+- Set `collection_interval: 0` to enable
+- Ideal for Kubernetes Jobs/CronJobs or scheduled batch processing
+- On error, exits with non-zero code allowing external retry logic
+
+## Authentication Modes
+
 The service supports two authentication modes depending on your deployment environment:
 
 **OpenShift Mode** (recommended for cluster deployments):
@@ -78,7 +95,7 @@ uv run python -m src.main --mode manual --config config.yaml \
 # Run with debug logging
 uv run python -m src.main --config config.yaml --log-level DEBUG
 
-# Run once without continuous collection
+# Run in single-shot mode (exit after one collection cycle)
 uv run python -m src.main --config config.yaml --collection-interval 0
 
 # Keep files after sending (useful for testing)

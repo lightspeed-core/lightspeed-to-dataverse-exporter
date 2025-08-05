@@ -31,7 +31,7 @@ spec:
         - "--log-level"
         - "DEBUG"
         - "--collection-interval"
-        - "30"  # Shorter interval for testing
+        - "0"  # Single-shot mode: exit after one collection cycle
         - "--ingress-server-auth-token"
         - "$(AUTH_TOKEN)"
         - "--identity-id"

@@ -135,7 +135,9 @@ class DataCollectorService:
 
         in_single_shot_mode = not self.collection_interval
         if in_single_shot_mode:
-            logger.info("Collection interval is not set, operating in single-shot mode")
+            logger.info(
+                "Collection interval is not set, operating in single-shot mode - service will exit after one data collection cycle"
+            )
 
         while True:
             try:
