@@ -207,20 +207,18 @@ class TestDataCollectorServiceRun:
 
     @patch("src.file_handler.FileHandler.collect_files")
     @patch("src.file_handler.FileHandler.gather_data_chunks")
-    @patch("src.data_exporter.time.sleep")
-    def test_run_no_data_found(self, mock_sleep, mock_gather, mock_collect):
+    def test_run_no_data_found(self, mock_gather, mock_collect):
         """Test run method when no data is found."""
         mock_collect.return_value = []
         mock_gather.return_value = []
-
-        # Mock sleep to break the loop after first iteration
-        mock_sleep.side_effect = KeyboardInterrupt()
 
         with tempfile.TemporaryDirectory() as tmpdir:
             config = create_test_config(data_dir=Path(tmpdir))
             service = DataCollectorService(config)
 
-            service.run()
+            # Mock _wait_or_shutdown to return True (shutdown requested) to break the loop
+            with patch.object(service, "_wait_or_shutdown", return_value=True):
+                service.run()
 
             mock_collect.assert_called()
             mock_gather.assert_called_with([])
@@ -246,10 +244,8 @@ class TestDataCollectorServiceRun:
     @patch("src.data_exporter.package_files_into_tarball")
     @patch("src.file_handler.FileHandler.delete_collected_files")
     @patch("src.file_handler.FileHandler.ensure_size_limit")
-    @patch("src.data_exporter.time.sleep")
     def test_run_with_data_cleanup_enabled(
         self,
-        mock_sleep,
         mock_ensure,
         mock_delete,
         mock_package,
@@ -264,14 +260,15 @@ class TestDataCollectorServiceRun:
         mock_gather.return_value = mock_chunks
         mock_package.return_value = io.BytesIO(b"tarball data")
 
-        # Mock sleep to break the loop after first iteration
-        mock_sleep.side_effect = KeyboardInterrupt()
-
         with tempfile.TemporaryDirectory() as tmpdir:
             config = create_test_config(data_dir=Path(tmpdir))
             service = DataCollectorService(config)
 
-            with patch.object(service.ingress_client, "upload_tarball"):
+            # Mock _wait_or_shutdown to return True (shutdown requested) to break the loop
+            with (
+                patch.object(service.ingress_client, "upload_tarball"),
+                patch.object(service, "_wait_or_shutdown", return_value=True),
+            ):
                 service.run()
 
             # Verify data processing workflow
@@ -286,10 +283,8 @@ class TestDataCollectorServiceRun:
     @patch("src.data_exporter.package_files_into_tarball")
     @patch("src.file_handler.FileHandler.delete_collected_files")
     @patch("src.file_handler.FileHandler.ensure_size_limit")
-    @patch("src.data_exporter.time.sleep")
     def test_run_with_data_cleanup_disabled(
         self,
-        mock_sleep,
         mock_ensure,
         mock_delete,
         mock_package,
@@ -304,14 +299,15 @@ class TestDataCollectorServiceRun:
         mock_gather.return_value = mock_chunks
         mock_package.return_value = io.BytesIO(b"tarball data")
 
-        # Mock sleep to break the loop after first iteration
-        mock_sleep.side_effect = KeyboardInterrupt()
-
         with tempfile.TemporaryDirectory() as tmpdir:
             config = create_test_config(data_dir=Path(tmpdir), cleanup_after_send=False)
             service = DataCollectorService(config)
 
-            with patch.object(service.ingress_client, "upload_tarball"):
+            # Mock _wait_or_shutdown to return True (shutdown requested) to break the loop
+            with (
+                patch.object(service.ingress_client, "upload_tarball"),
+                patch.object(service, "_wait_or_shutdown", return_value=True),
+            ):
                 service.run()
 
             # Verify cleanup functions are not called
@@ -320,17 +316,18 @@ class TestDataCollectorServiceRun:
 
     @patch("src.file_handler.FileHandler.collect_files")
     @patch("src.data_exporter.logger")
-    @patch("src.data_exporter.time.sleep")
-    def test_run_handles_os_error(self, mock_sleep, mock_logger, mock_collect):
+    def test_run_handles_os_error(self, mock_logger, mock_collect):
         """Test run method handles OSError gracefully."""
-        # Mock collect_files to raise OSError
-        mock_collect.side_effect = [OSError("File system error"), KeyboardInterrupt()]
+        # Mock collect_files to raise OSError on first call, then work normally
+        mock_collect.side_effect = [OSError("File system error"), []]
 
         with tempfile.TemporaryDirectory() as tmpdir:
             config = create_test_config(data_dir=Path(tmpdir))
             service = DataCollectorService(config)
 
-            service.run()
+            # Mock _wait_or_shutdown to return True (shutdown) during retry to break the loop
+            with patch.object(service, "_wait_or_shutdown", return_value=True):
+                service.run()
 
             # Should log error and retry
             mock_logger.error.assert_called()
@@ -339,28 +336,23 @@ class TestDataCollectorServiceRun:
 
     @patch("src.file_handler.FileHandler.collect_files")
     @patch("src.data_exporter.logger")
-    @patch("src.data_exporter.time.sleep")
-    def test_run_handles_request_exception(self, mock_sleep, mock_logger, mock_collect):
+    def test_run_handles_request_exception(self, mock_logger, mock_collect):
         """Test run method handles RequestException gracefully."""
-        # Mock to raise RequestException first, then KeyboardInterrupt to exit
-        mock_collect.side_effect = [
-            requests.RequestException("Network error"),
-            KeyboardInterrupt(),
-        ]
+        # Mock to raise RequestException on first call, then work normally
+        mock_collect.side_effect = [requests.RequestException("Network error"), []]
 
         with tempfile.TemporaryDirectory() as tmpdir:
             config = create_test_config(data_dir=Path(tmpdir))
             service = DataCollectorService(config)
 
-            service.run()
+            # Mock _wait_or_shutdown to return True (shutdown) during retry to break the loop
+            with patch.object(service, "_wait_or_shutdown", return_value=True):
+                service.run()
 
             # Should log error about the exception
             mock_logger.error.assert_called()
             error_call = mock_logger.error.call_args[0]
             assert "Error during collection process" in error_call[0]
-
-            # Should sleep with retry interval after exception
-            mock_sleep.assert_called()
 
     @patch("src.file_handler.FileHandler.collect_files")
     def test_run_handles_request_exception_in_single_shot_mode(self, mock_collect):
@@ -382,3 +374,168 @@ class TestDataCollectorServiceRun:
                 assert (
                     False
                 ), "service should have reraised exception when in single shot mode"
+
+
+class TestDataCollectorServiceSignalHandling:
+    """Test cases for DataCollectorService signal handling functionality."""
+
+    def test_request_shutdown_sets_event(self):
+        """Test that request_shutdown sets the shutdown event."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config = create_test_config(data_dir=Path(tmpdir))
+            service = DataCollectorService(config)
+
+            # Initially event should not be set
+            assert not service._shutdown_event.is_set()
+
+            # Request shutdown
+            service.request_shutdown()
+
+            # Event should now be set
+            assert service._shutdown_event.is_set()
+
+    @patch("src.file_handler.FileHandler.collect_files")
+    @patch("src.file_handler.FileHandler.gather_data_chunks")
+    def test_wait_or_shutdown_returns_false_on_timeout(self, mock_gather, mock_collect):
+        """Test _wait_or_shutdown returns False when timeout elapses normally."""
+        mock_collect.return_value = []
+        mock_gather.return_value = []
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config = create_test_config(data_dir=Path(tmpdir))
+            service = DataCollectorService(config)
+
+            # Test with very short timeout - should return False (timeout)
+            result = service._wait_or_shutdown(timeout=0.01, wait_type="test")
+            assert result is False
+
+    @patch("src.file_handler.FileHandler.collect_files")
+    @patch("src.file_handler.FileHandler.gather_data_chunks")
+    def test_wait_or_shutdown_returns_true_on_shutdown(self, mock_gather, mock_collect):
+        """Test _wait_or_shutdown returns True when shutdown event is set."""
+        mock_collect.return_value = []
+        mock_gather.return_value = []
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config = create_test_config(data_dir=Path(tmpdir))
+            service = DataCollectorService(config)
+
+            # Set shutdown event before waiting
+            service._shutdown_event.set()
+
+            # Should return True immediately (shutdown requested)
+            result = service._wait_or_shutdown(timeout=10, wait_type="test")
+            assert result is True
+
+    @patch("src.file_handler.FileHandler.collect_files")
+    @patch("src.file_handler.FileHandler.gather_data_chunks")
+    def test_signal_interrupts_normal_collection_wait(self, mock_gather, mock_collect):
+        """Test that signal during normal collection wait triggers final collection."""
+        mock_collect.return_value = []
+        mock_gather.return_value = []
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config = create_test_config(data_dir=Path(tmpdir))
+            service = DataCollectorService(config)
+
+            # Mock threading.Event.wait to return True (signal received)
+            with patch.object(service._shutdown_event, "wait", return_value=True):
+                service.run()
+
+            # Should have called collect_files twice:
+            # 1. Initial collection at start of loop
+            # 2. Final collection when signal received
+            assert mock_collect.call_count == 2
+
+    @patch("src.file_handler.FileHandler.collect_files")
+    @patch("src.data_exporter.logger")
+    def test_signal_interrupts_retry_wait_and_attempts_final_collection(
+        self, mock_logger, mock_collect
+    ):
+        """Test that signal during retry wait triggers final collection attempt."""
+        # First call raises error, second call (final collection) succeeds
+        mock_collect.side_effect = [OSError("File system error"), []]
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config = create_test_config(data_dir=Path(tmpdir))
+            service = DataCollectorService(config)
+
+            # Mock _wait_or_shutdown to return True (signal during retry)
+            with patch.object(service, "_wait_or_shutdown", return_value=True):
+                service.run()
+
+            # Should have called collect_files twice:
+            # 1. Initial collection that failed
+            # 2. Final collection attempt after signal
+            assert mock_collect.call_count == 2
+
+            # Should log the original error
+            mock_logger.error.assert_called()
+            error_call = mock_logger.error.call_args[0]
+            assert "Error during collection process" in error_call[0]
+
+            # Should also log final collection attempt
+            mock_logger.info.assert_any_call(
+                "Shutdown requested during retry, attempting final collection..."
+            )
+
+    @patch("src.file_handler.FileHandler.collect_files")
+    @patch("src.data_exporter.logger")
+    def test_signal_during_retry_handles_final_collection_failure(
+        self, mock_logger, mock_collect
+    ):
+        """Test that signal during retry handles final collection failure gracefully."""
+        # Both calls fail
+        original_error = OSError("File system error")
+        final_error = OSError("Final collection failed")
+        mock_collect.side_effect = [original_error, final_error]
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config = create_test_config(data_dir=Path(tmpdir))
+            service = DataCollectorService(config)
+
+            # Mock _wait_or_shutdown to return True (signal during retry)
+            with patch.object(service, "_wait_or_shutdown", return_value=True):
+                service.run()
+
+            # Should have called collect_files twice
+            assert mock_collect.call_count == 2
+
+            # Should log both the original error and final collection failure
+            mock_logger.error.assert_any_call(
+                "Error during collection process: %s", original_error, exc_info=True
+            )
+            mock_logger.error.assert_any_call(
+                "Final collection attempt failed: %s", final_error, exc_info=True
+            )
+
+    @patch("src.file_handler.FileHandler.collect_files")
+    @patch("src.file_handler.FileHandler.gather_data_chunks")
+    @patch("src.data_exporter.package_files_into_tarball")
+    def test_signal_during_normal_wait_performs_final_collection_with_data(
+        self, mock_package, mock_gather, mock_collect
+    ):
+        """Test signal during normal wait performs final collection when data is available."""
+        # Setup mocks for data collection
+        mock_files = [(Path("/test/file1.json"), 100)]
+        mock_collect.return_value = mock_files
+        mock_chunks = [[Path("/test/file1.json")]]
+        mock_gather.return_value = mock_chunks
+        mock_package.return_value = io.BytesIO(b"tarball data")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config = create_test_config(data_dir=Path(tmpdir))
+            service = DataCollectorService(config)
+
+            # Mock _wait_or_shutdown to return True (signal received)
+            with (
+                patch.object(service.ingress_client, "upload_tarball"),
+                patch.object(service, "_wait_or_shutdown", return_value=True),
+            ):
+                service.run()
+
+            # Should have called collect_files twice (initial + final)
+            assert mock_collect.call_count == 2
+            # Should have processed data twice
+            assert mock_gather.call_count == 2
+            assert mock_package.call_count == 2

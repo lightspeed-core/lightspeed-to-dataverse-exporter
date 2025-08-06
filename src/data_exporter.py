@@ -12,7 +12,7 @@ import pathlib
 import tarfile
 from pathlib import Path
 import logging
-import time
+import threading
 import requests
 
 from src.constants import DATA_COLLECTOR_RETRY_INTERVAL
@@ -72,6 +72,9 @@ class DataCollectorService:
         self.collection_interval = config.collection_interval
         self.cleanup_after_send = config.cleanup_after_send
 
+        # Shutdown event for graceful termination
+        self._shutdown_event = threading.Event()
+
         # Initialize file handler for this service
         self.file_handler = FileHandler(
             config.data_dir, allowed_subdirs=config.allowed_subdirs
@@ -85,6 +88,32 @@ class DataCollectorService:
             identity_id=config.identity_id,
             connection_timeout=config.ingress_connection_timeout,
         )
+
+    def request_shutdown(self) -> None:
+        """Request graceful shutdown of the service."""
+        logger.info("Shutdown requested, will perform final collection and exit")
+        self._shutdown_event.set()  # Wake up any waiting threads immediately
+
+    def _wait_or_shutdown(self, timeout: int, wait_type: str = "collection") -> bool:
+        """Wait for timeout or shutdown signal, whichever comes first.
+
+        Args:
+            timeout: Number of seconds to wait
+            wait_type: Type of wait for logging ("collection" or "retry")
+
+        Returns:
+            True if shutdown was requested, False if timeout elapsed normally
+        """
+        if self._shutdown_event.wait(timeout=timeout):
+            # Event was set (shutdown requested)
+            logger.debug(
+                "%s sleep interrupted by shutdown request", wait_type.capitalize()
+            )
+            return True
+        else:
+            # Timeout elapsed normally (no shutdown requested)
+            logger.debug("%s sleep interval completed normally", wait_type.capitalize())
+            return False
 
     def _process_data_collection(self) -> None:
         """Process a single data collection cycle."""
@@ -130,7 +159,35 @@ class DataCollectorService:
             self.file_handler.delete_collected_files(data_chunk)
 
     def run(self) -> None:
-        """Run the periodic data collection loop."""
+        """Run the periodic data collection loop.
+
+        Flow:
+        1. Single-shot mode: Collect data once and exit
+        2. Periodic mode: Continuous loop with the following cycle:
+           a. Collect and upload data
+           b. Wait for collection_interval or shutdown signal
+           c. If signal received during wait: perform final collection and exit
+           d. If timeout elapsed normally: continue to next cycle
+
+        Error handling:
+        - Network/IO errors: Retry after DATA_COLLECTOR_RETRY_INTERVAL
+        - If signal received during retry wait: attempt final collection and exit
+        - KeyboardInterrupt: Clean exit
+
+        Signal handling:
+        - SIGTERM triggers request_shutdown() which sets _shutdown_event
+        - Service responds immediately by interrupting any active wait
+        - Always attempts final data collection before exit for data safety
+
+        Single-shot mode (collection_interval is 0 or None):
+        - Collects data once and exits immediately
+        - Used for batch processing or scheduled jobs
+
+        Periodic mode (collection_interval > 0):
+        - Runs continuously until shutdown signal or error
+        - Sleeps efficiently using threading.Event.wait() with timeout
+        - Responsive to shutdown signals (no polling, immediate wake-up)
+        """
         logger.info("Starting data collection service")
 
         in_single_shot_mode = not self.collection_interval
@@ -150,7 +207,16 @@ class DataCollectorService:
                     "Waiting %d seconds before next collection",
                     self.collection_interval,
                 )
-                time.sleep(self.collection_interval)
+
+                # Wait for the collection interval or shutdown signal (whichever comes first)
+                if self._wait_or_shutdown(self.collection_interval, "collection"):
+                    # Shutdown was requested during collection wait
+                    logger.info("Shutdown requested, performing final collection...")
+                    self._process_data_collection()
+                    logger.info("Shutdown completed after final data collection")
+                    return
+                # If wait returned False, timeout elapsed normally - continue to next collection cycle
+
             except KeyboardInterrupt:
                 logger.info("Data collection service stopped by user")
                 break
@@ -163,5 +229,22 @@ class DataCollectorService:
                     # whatever retry policy it wants.
                     raise e
 
-                logger.info("Retrying in %d seconds...", self.collection_interval)
-                time.sleep(DATA_COLLECTOR_RETRY_INTERVAL)
+                logger.info("Retrying in %d seconds...", DATA_COLLECTOR_RETRY_INTERVAL)
+
+                # Wait for retry interval or shutdown signal (whichever comes first)
+                if self._wait_or_shutdown(DATA_COLLECTOR_RETRY_INTERVAL, "retry"):
+                    # Shutdown was requested during retry wait - attempt final collection
+                    logger.info(
+                        "Shutdown requested during retry, attempting final collection..."
+                    )
+                    try:
+                        self._process_data_collection()
+                        logger.info("Final collection completed successfully")
+                    except Exception as final_e:
+                        logger.error(
+                            "Final collection attempt failed: %s",
+                            final_e,
+                            exc_info=True,
+                        )
+                    logger.info("Shutdown completed after final collection attempt")
+                    return  # Exit the service entirely

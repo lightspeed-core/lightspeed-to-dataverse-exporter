@@ -3,6 +3,7 @@
 
 import argparse
 import logging
+import signal
 import sys
 from os import environ
 from pathlib import Path
@@ -12,6 +13,9 @@ from src.auth import get_auth_credentials, AuthenticationError
 from src import constants
 
 logger = logging.getLogger(__name__)
+
+# Global reference to service for signal handler
+_service_instance = None
 
 
 def validate_required_config(config_dict: dict, mode: str) -> None:
@@ -182,11 +186,33 @@ def configure_logging(log_level: str, use_rich: bool = False) -> None:
     logging.getLogger("urllib3").setLevel(logging.WARNING)
 
 
+def sigterm_handler(signum, frame):
+    """Handle SIGTERM signal for graceful shutdown.
+
+    Args:
+        signum: Signal number
+        frame: Current stack frame
+    """
+    logger.info("Received SIGTERM signal, requesting graceful shutdown...")
+
+    global _service_instance
+    if _service_instance is not None:
+        # Request shutdown - the service will perform final collection and exit gracefully
+        _service_instance.request_shutdown()
+    else:
+        logger.warning("No service instance available for graceful shutdown")
+        sys.exit(0)
+
+
 def main() -> int:
     """Main function."""
     args = parse_args()
 
     configure_logging(args.log_level, args.rich_logs)
+
+    # Register SIGTERM handler for graceful shutdown
+    signal.signal(signal.SIGTERM, sigterm_handler)
+    logger.debug("SIGTERM handler registered")
 
     logger.info("Starting Lightspeed to Dataverse exporter (mode: %s)", args.mode)
 
@@ -252,6 +278,10 @@ def main() -> int:
         # Create settings from merged config
         config = DataCollectorSettings(**config_dict)
         service = DataCollectorService(config)
+
+        # Store service reference globally for signal handler
+        global _service_instance
+        _service_instance = service
 
         service.run()
 
