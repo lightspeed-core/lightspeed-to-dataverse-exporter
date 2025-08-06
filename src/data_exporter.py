@@ -12,10 +12,10 @@ import pathlib
 import tarfile
 from pathlib import Path
 import logging
+import threading
 import time
 import requests
 
-from src.constants import DATA_COLLECTOR_RETRY_INTERVAL
 from src.file_handler import FileHandler
 from src.ingress_client import IngressClient
 from src.settings import DataCollectorSettings
@@ -59,6 +59,8 @@ class DataCollectorService:
     including feedback and transcripts to the configured ingress server.
     """
 
+    shutdown_event: threading.Event
+
     def __init__(self, config: DataCollectorSettings) -> None:
         """Initialize the data collector service.
 
@@ -85,6 +87,8 @@ class DataCollectorService:
             identity_id=config.identity_id,
             connection_timeout=config.ingress_connection_timeout,
         )
+
+        self.shutdown_event = threading.Event()
 
     def _process_data_collection(self) -> None:
         """Process a single data collection cycle."""
@@ -139,8 +143,10 @@ class DataCollectorService:
                 "Collection interval is not set, operating in single-shot mode - service will exit after one data collection cycle"
             )
 
-        while True:
+        while not self.shutdown_event.is_set():
             try:
+                next_collection = time.time() + self.collection_interval
+
                 self._process_data_collection()
 
                 if in_single_shot_mode:
@@ -150,7 +156,10 @@ class DataCollectorService:
                     "Waiting %d seconds before next collection",
                     self.collection_interval,
                 )
-                time.sleep(self.collection_interval)
+
+                time_to_wait = next_collection - time.time()
+                if time_to_wait > 0:
+                    _ = self.shutdown_event.wait(time_to_wait)
             except KeyboardInterrupt:
                 logger.info("Data collection service stopped by user")
                 break
@@ -163,5 +172,17 @@ class DataCollectorService:
                     # whatever retry policy it wants.
                     raise e
 
-                logger.info("Retrying in %d seconds...", self.collection_interval)
-                time.sleep(DATA_COLLECTOR_RETRY_INTERVAL)
+                if not self.shutdown_event.is_set():
+                    logger.info("Retrying in %d seconds...", self.collection_interval)
+                    _ = self.shutdown_event.wait(self.collection_interval)
+
+        logger.info("Doing one final collection before shutdown")
+        # Exceptions (other than KeyboardInterrupt) here should bubble up because they indicate
+        # there is data that potentially will not be sent before the process terminates.
+        try:
+            self._process_data_collection()
+        except KeyboardInterrupt:
+            pass
+
+    def shutdown(self) -> None:
+        self.shutdown_event.set()

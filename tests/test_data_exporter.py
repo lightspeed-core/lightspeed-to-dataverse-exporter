@@ -2,6 +2,8 @@
 
 import tempfile
 from pathlib import Path
+import threading
+import time
 from unittest.mock import patch
 import io
 import requests
@@ -202,24 +204,26 @@ class TestPackageFilesIntoTarball:
 # since these functions are now part of the FileHandler class as delete_files() and ensure_size_limit()
 
 
+def stop_after_delay(service: DataCollectorService):
+    time.sleep(2)
+    service.shutdown()
+
+
 class TestDataCollectorServiceRun:
     """Test cases for DataCollectorService.run method."""
 
     @patch("src.file_handler.FileHandler.collect_files")
     @patch("src.file_handler.FileHandler.gather_data_chunks")
-    @patch("src.data_exporter.time.sleep")
-    def test_run_no_data_found(self, mock_sleep, mock_gather, mock_collect):
+    def test_run_no_data_found(self, mock_gather, mock_collect):
         """Test run method when no data is found."""
         mock_collect.return_value = []
         mock_gather.return_value = []
-
-        # Mock sleep to break the loop after first iteration
-        mock_sleep.side_effect = KeyboardInterrupt()
 
         with tempfile.TemporaryDirectory() as tmpdir:
             config = create_test_config(data_dir=Path(tmpdir))
             service = DataCollectorService(config)
 
+            threading.Thread(target=stop_after_delay, args=[service]).start()
             service.run()
 
             mock_collect.assert_called()
@@ -246,10 +250,8 @@ class TestDataCollectorServiceRun:
     @patch("src.data_exporter.package_files_into_tarball")
     @patch("src.file_handler.FileHandler.delete_collected_files")
     @patch("src.file_handler.FileHandler.ensure_size_limit")
-    @patch("src.data_exporter.time.sleep")
     def test_run_with_data_cleanup_enabled(
         self,
-        mock_sleep,
         mock_ensure,
         mock_delete,
         mock_package,
@@ -264,14 +266,12 @@ class TestDataCollectorServiceRun:
         mock_gather.return_value = mock_chunks
         mock_package.return_value = io.BytesIO(b"tarball data")
 
-        # Mock sleep to break the loop after first iteration
-        mock_sleep.side_effect = KeyboardInterrupt()
-
         with tempfile.TemporaryDirectory() as tmpdir:
             config = create_test_config(data_dir=Path(tmpdir))
             service = DataCollectorService(config)
 
             with patch.object(service.ingress_client, "upload_tarball"):
+                threading.Thread(target=stop_after_delay, args=[service]).start()
                 service.run()
 
             # Verify data processing workflow
@@ -286,10 +286,8 @@ class TestDataCollectorServiceRun:
     @patch("src.data_exporter.package_files_into_tarball")
     @patch("src.file_handler.FileHandler.delete_collected_files")
     @patch("src.file_handler.FileHandler.ensure_size_limit")
-    @patch("src.data_exporter.time.sleep")
     def test_run_with_data_cleanup_disabled(
         self,
-        mock_sleep,
         mock_ensure,
         mock_delete,
         mock_package,
@@ -304,14 +302,12 @@ class TestDataCollectorServiceRun:
         mock_gather.return_value = mock_chunks
         mock_package.return_value = io.BytesIO(b"tarball data")
 
-        # Mock sleep to break the loop after first iteration
-        mock_sleep.side_effect = KeyboardInterrupt()
-
         with tempfile.TemporaryDirectory() as tmpdir:
             config = create_test_config(data_dir=Path(tmpdir), cleanup_after_send=False)
             service = DataCollectorService(config)
 
             with patch.object(service.ingress_client, "upload_tarball"):
+                threading.Thread(target=stop_after_delay, args=[service]).start()
                 service.run()
 
             # Verify cleanup functions are not called
@@ -320,8 +316,7 @@ class TestDataCollectorServiceRun:
 
     @patch("src.file_handler.FileHandler.collect_files")
     @patch("src.data_exporter.logger")
-    @patch("src.data_exporter.time.sleep")
-    def test_run_handles_os_error(self, mock_sleep, mock_logger, mock_collect):
+    def test_run_handles_os_error(self, mock_logger, mock_collect):
         """Test run method handles OSError gracefully."""
         # Mock collect_files to raise OSError
         mock_collect.side_effect = [OSError("File system error"), KeyboardInterrupt()]
@@ -330,6 +325,7 @@ class TestDataCollectorServiceRun:
             config = create_test_config(data_dir=Path(tmpdir))
             service = DataCollectorService(config)
 
+            threading.Thread(target=stop_after_delay, args=[service]).start()
             service.run()
 
             # Should log error and retry
@@ -339,8 +335,7 @@ class TestDataCollectorServiceRun:
 
     @patch("src.file_handler.FileHandler.collect_files")
     @patch("src.data_exporter.logger")
-    @patch("src.data_exporter.time.sleep")
-    def test_run_handles_request_exception(self, mock_sleep, mock_logger, mock_collect):
+    def test_run_handles_request_exception(self, mock_logger, mock_collect):
         """Test run method handles RequestException gracefully."""
         # Mock to raise RequestException first, then KeyboardInterrupt to exit
         mock_collect.side_effect = [
@@ -352,15 +347,13 @@ class TestDataCollectorServiceRun:
             config = create_test_config(data_dir=Path(tmpdir))
             service = DataCollectorService(config)
 
+            threading.Thread(target=stop_after_delay, args=[service]).start()
             service.run()
 
             # Should log error about the exception
             mock_logger.error.assert_called()
             error_call = mock_logger.error.call_args[0]
             assert "Error during collection process" in error_call[0]
-
-            # Should sleep with retry interval after exception
-            mock_sleep.assert_called()
 
     @patch("src.file_handler.FileHandler.collect_files")
     def test_run_handles_request_exception_in_single_shot_mode(self, mock_collect):
