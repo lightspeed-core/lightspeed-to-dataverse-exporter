@@ -37,6 +37,7 @@ class DataCollectorSettings(BaseModel):
     ingress_connection_timeout: PositiveInt = (
         constants.DATA_COLLECTOR_CONNECTION_TIMEOUT
     )
+    retry_interval: PositiveInt = constants.DATA_COLLECTOR_RETRY_INTERVAL
     allowed_subdirs: list[str] = Field(default_factory=list)
 
     @classmethod

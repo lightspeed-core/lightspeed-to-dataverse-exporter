@@ -106,6 +106,12 @@ def parse_args() -> argparse.Namespace:
     )
 
     parser.add_argument(
+        "--retry-interval",
+        type=int,
+        help="Retry interval in seconds when collection fails",
+    )
+
+    parser.add_argument(
         "--no-cleanup",
         action="store_true",
         help="Do not clean up files after successful send",
@@ -220,6 +226,8 @@ def main() -> int:
             config_dict["collection_interval"] = args.collection_interval
         if args.ingress_connection_timeout:
             config_dict["ingress_connection_timeout"] = args.ingress_connection_timeout
+        if args.retry_interval:
+            config_dict["retry_interval"] = args.retry_interval
         if args.no_cleanup:
             config_dict["cleanup_after_send"] = False
         if args.allowed_subdirs:
@@ -246,6 +254,9 @@ def main() -> int:
         )
         config_dict.setdefault(
             "ingress_connection_timeout", constants.DATA_COLLECTOR_CONNECTION_TIMEOUT
+        )
+        config_dict.setdefault(
+            "retry_interval", constants.DATA_COLLECTOR_RETRY_INTERVAL
         )
         config_dict.setdefault("cleanup_after_send", True)
         config_dict.setdefault("allowed_subdirs", [])

@@ -18,7 +18,7 @@ import requests
 
 from src.file_handler import FileHandler
 from src.ingress_client import IngressClient
-from src.constants import DATA_COLLECTOR_RETRY_INTERVAL
+
 from src.settings import DataCollectorSettings
 
 logger = logging.getLogger(__name__)
@@ -74,6 +74,7 @@ class DataCollectorService:
         self.data_dir = config.data_dir
         self.collection_interval = config.collection_interval
         self.cleanup_after_send = config.cleanup_after_send
+        self.retry_interval = config.retry_interval
 
         # Initialize file handler for this service
         self.file_handler = FileHandler(
@@ -174,10 +175,8 @@ class DataCollectorService:
                     raise e
 
                 if not self.shutdown_event.is_set():
-                    logger.info(
-                        "Retrying in %d seconds...", DATA_COLLECTOR_RETRY_INTERVAL
-                    )
-                    _ = self.shutdown_event.wait(DATA_COLLECTOR_RETRY_INTERVAL)
+                    logger.info("Retrying in %d seconds...", self.retry_interval)
+                    _ = self.shutdown_event.wait(self.retry_interval)
 
         logger.info("Doing one final collection before shutdown")
         # Exceptions (other than KeyboardInterrupt) here should bubble up because they indicate
