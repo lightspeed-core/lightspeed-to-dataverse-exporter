@@ -197,6 +197,7 @@ class TestMain:
         mock_args.no_cleanup = False
         mock_args.rich_logs = False
         mock_args.allowed_subdirs = None
+        mock_args.retry_interval = None
         mock_parse_args.return_value = mock_args
 
         mock_get_auth.return_value = ("openshift-token", "openshift-identity")
@@ -247,6 +248,7 @@ class TestMain:
         mock_args.no_cleanup = True
         mock_args.rich_logs = False
         mock_args.allowed_subdirs = None
+        mock_args.retry_interval = None
         mock_parse_args.return_value = mock_args
 
         mock_get_auth.return_value = ("test-token", "test-identity")
@@ -288,6 +290,7 @@ class TestMain:
         mock_args.no_cleanup = False
         mock_args.rich_logs = False
         mock_args.allowed_subdirs = None
+        mock_args.retry_interval = None
         mock_parse_args.return_value = mock_args
 
         with pytest.raises(SystemExit) as exc_info:
@@ -316,6 +319,7 @@ class TestMain:
         mock_args.no_cleanup = False
         mock_args.rich_logs = False
         mock_args.allowed_subdirs = None
+        mock_args.retry_interval = None
         mock_parse_args.return_value = mock_args
 
         from src.auth import AuthenticationError
@@ -348,6 +352,7 @@ class TestMain:
         mock_args.no_cleanup = False
         mock_args.rich_logs = False
         mock_args.allowed_subdirs = None
+        mock_args.retry_interval = None
         mock_parse_args.return_value = mock_args
 
         mock_get_auth.return_value = ("test-token", "test-identity")
@@ -382,6 +387,7 @@ class TestMain:
         mock_args.no_cleanup = False
         mock_args.rich_logs = False
         mock_args.allowed_subdirs = None
+        mock_args.retry_interval = None
         mock_parse_args.return_value = mock_args
 
         mock_get_auth.return_value = ("test-token", "test-identity")
@@ -412,6 +418,7 @@ class TestMain:
         mock_args.no_cleanup = False
         mock_args.rich_logs = False
         mock_args.allowed_subdirs = None
+        mock_args.retry_interval = None
 
         # Apply any test-specific overrides
         for key, value in overrides.items():

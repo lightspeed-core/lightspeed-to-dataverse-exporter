@@ -23,6 +23,7 @@ class TestDataCollectorSettings:
             collection_interval=300,
             cleanup_after_send=True,
             ingress_connection_timeout=30,
+            retry_interval=120,
         )
 
         assert settings.data_dir == Path("/tmp")
@@ -33,6 +34,7 @@ class TestDataCollectorSettings:
         assert settings.collection_interval == 300
         assert settings.cleanup_after_send is True
         assert settings.ingress_connection_timeout == 30
+        assert settings.retry_interval == 120
 
     def test_settings_with_defaults(self):
         """Test settings creation with default values."""
@@ -48,6 +50,7 @@ class TestDataCollectorSettings:
         assert settings.collection_interval == 7200  # Default from constants
         assert settings.cleanup_after_send is True
         assert settings.ingress_connection_timeout == 30  # Default from constants
+        assert settings.retry_interval == 300  # Default from constants
         assert settings.allowed_subdirs == []  # Default: collect everything
 
     def test_invalid_data_dir(self):
@@ -95,6 +98,7 @@ class TestDataCollectorSettings:
             "collection_interval": 600,
             "cleanup_after_send": False,
             "ingress_connection_timeout": 60,
+            "retry_interval": 180,
         }
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
@@ -114,6 +118,7 @@ class TestDataCollectorSettings:
             assert settings.collection_interval == 600
             assert settings.cleanup_after_send is False
             assert settings.ingress_connection_timeout == 60
+            assert settings.retry_interval == 180
             assert settings.allowed_subdirs == []  # Default when not in YAML
         finally:
             config_file.unlink()

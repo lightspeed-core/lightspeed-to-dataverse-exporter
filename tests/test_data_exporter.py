@@ -14,7 +14,6 @@ from src.data_exporter import (
     package_files_into_tarball,
 )
 from src.settings import DataCollectorSettings
-from src.constants import DATA_COLLECTOR_RETRY_INTERVAL
 
 
 def create_test_config(**overrides) -> DataCollectorSettings:
@@ -369,7 +368,7 @@ class TestDataCollectorServiceRun:
     @patch("src.file_handler.FileHandler.collect_files")
     @patch("src.data_exporter.logger")
     def test_retry_uses_correct_interval(self, mock_logger, mock_collect):
-        """Test that retry logic uses DATA_COLLECTOR_RETRY_INTERVAL constant."""
+        """Test that retry logic uses configurable retry_interval."""
         # Mock collect_files to raise an exception on first call, then KeyboardInterrupt
         call_count = 0
 
@@ -384,7 +383,11 @@ class TestDataCollectorServiceRun:
         mock_collect.side_effect = mock_collect_side_effect
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            config = create_test_config(data_dir=Path(tmpdir))
+            # Test with a custom retry interval to ensure config is used
+            custom_retry_interval = 120
+            config = create_test_config(
+                data_dir=Path(tmpdir), retry_interval=custom_retry_interval
+            )
             service = DataCollectorService(config)
 
             # Mock the shutdown_event.wait method to capture the retry interval
@@ -395,9 +398,9 @@ class TestDataCollectorServiceRun:
                 service.run()
 
                 # Verify that wait was called with the correct retry interval
-                mock_wait.assert_called_with(DATA_COLLECTOR_RETRY_INTERVAL)
+                mock_wait.assert_called_with(custom_retry_interval)
 
                 # Verify the log message includes the correct interval
                 mock_logger.info.assert_any_call(
-                    "Retrying in %d seconds...", DATA_COLLECTOR_RETRY_INTERVAL
+                    "Retrying in %d seconds...", custom_retry_interval
                 )
