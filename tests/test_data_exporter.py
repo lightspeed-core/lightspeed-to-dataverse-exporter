@@ -16,10 +16,6 @@ from src.data_exporter import (
 from src.settings import DataCollectorSettings
 
 
-# Note: FilterAllowedFiles and CollectFiles tests moved to test_file_handler.py
-# since these functions are now part of the FileHandler class
-
-
 def create_test_config(**overrides) -> DataCollectorSettings:
     """Create a DataCollectorSettings for testing with default values.
 
@@ -124,10 +120,6 @@ class TestDataCollectorService:
             assert service.file_handler.allowed_subdirs == custom_subdirs
 
 
-# Note: GatherDataChunks tests moved to test_file_handler.py
-# since this functionality is now part of the FileHandler class
-
-
 class TestPackageFilesIntoTarball:
     """Test cases for package_files_into_tarball function."""
 
@@ -198,10 +190,6 @@ class TestPackageFilesIntoTarball:
                 members = tar.getnames()
                 assert "regular.json" in members
                 assert "symlink.json" not in members  # Symlink should be skipped
-
-
-# Note: DeleteData and EnsureDataDirSize tests moved to test_file_handler.py
-# since these functions are now part of the FileHandler class as delete_files() and ensure_size_limit()
 
 
 def stop_after_delay(service: DataCollectorService):
