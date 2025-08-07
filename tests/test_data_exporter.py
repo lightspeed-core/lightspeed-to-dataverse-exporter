@@ -192,8 +192,9 @@ class TestPackageFilesIntoTarball:
                 assert "symlink.json" not in members  # Symlink should be skipped
 
 
-def stop_after_delay(service: DataCollectorService):
-    time.sleep(2)
+def stop_service(service: DataCollectorService):
+    # Small delay to allow service to process at least one iteration
+    time.sleep(0.1)
     service.shutdown()
 
 
@@ -211,7 +212,7 @@ class TestDataCollectorServiceRun:
             config = create_test_config(data_dir=Path(tmpdir))
             service = DataCollectorService(config)
 
-            threading.Thread(target=stop_after_delay, args=[service]).start()
+            threading.Thread(target=stop_service, args=[service]).start()
             service.run()
 
             mock_collect.assert_called()
@@ -259,7 +260,7 @@ class TestDataCollectorServiceRun:
             service = DataCollectorService(config)
 
             with patch.object(service.ingress_client, "upload_tarball"):
-                threading.Thread(target=stop_after_delay, args=[service]).start()
+                threading.Thread(target=stop_service, args=[service]).start()
                 service.run()
 
             # Verify data processing workflow
@@ -295,7 +296,7 @@ class TestDataCollectorServiceRun:
             service = DataCollectorService(config)
 
             with patch.object(service.ingress_client, "upload_tarball"):
-                threading.Thread(target=stop_after_delay, args=[service]).start()
+                threading.Thread(target=stop_service, args=[service]).start()
                 service.run()
 
             # Verify cleanup functions are not called
@@ -313,7 +314,7 @@ class TestDataCollectorServiceRun:
             config = create_test_config(data_dir=Path(tmpdir))
             service = DataCollectorService(config)
 
-            threading.Thread(target=stop_after_delay, args=[service]).start()
+            threading.Thread(target=stop_service, args=[service]).start()
             service.run()
 
             # Should log error and retry
@@ -335,7 +336,7 @@ class TestDataCollectorServiceRun:
             config = create_test_config(data_dir=Path(tmpdir))
             service = DataCollectorService(config)
 
-            threading.Thread(target=stop_after_delay, args=[service]).start()
+            threading.Thread(target=stop_service, args=[service]).start()
             service.run()
 
             # Should log error about the exception
