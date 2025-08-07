@@ -14,6 +14,7 @@ from src.data_exporter import (
     package_files_into_tarball,
 )
 from src.settings import DataCollectorSettings
+from src.constants import DATA_COLLECTOR_RETRY_INTERVAL
 
 
 def create_test_config(**overrides) -> DataCollectorSettings:
@@ -364,3 +365,39 @@ class TestDataCollectorServiceRun:
                 assert (
                     False
                 ), "service should have reraised exception when in single shot mode"
+
+    @patch("src.file_handler.FileHandler.collect_files")
+    @patch("src.data_exporter.logger")
+    def test_retry_uses_correct_interval(self, mock_logger, mock_collect):
+        """Test that retry logic uses DATA_COLLECTOR_RETRY_INTERVAL constant."""
+        # Mock collect_files to raise an exception on first call, then KeyboardInterrupt
+        call_count = 0
+
+        def mock_collect_side_effect():
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                raise requests.RequestException("Network error")
+            else:
+                raise KeyboardInterrupt()  # Exit the loop on subsequent calls
+
+        mock_collect.side_effect = mock_collect_side_effect
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config = create_test_config(data_dir=Path(tmpdir))
+            service = DataCollectorService(config)
+
+            # Mock the shutdown_event.wait method to capture the retry interval
+            with patch.object(service.shutdown_event, "wait") as mock_wait:
+                # First call returns False (not set), second call can return True or raise KeyboardInterrupt
+                mock_wait.side_effect = [False, KeyboardInterrupt()]
+
+                service.run()
+
+                # Verify that wait was called with the correct retry interval
+                mock_wait.assert_called_with(DATA_COLLECTOR_RETRY_INTERVAL)
+
+                # Verify the log message includes the correct interval
+                mock_logger.info.assert_any_call(
+                    "Retrying in %d seconds...", DATA_COLLECTOR_RETRY_INTERVAL
+                )
