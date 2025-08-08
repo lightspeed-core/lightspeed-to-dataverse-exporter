@@ -6,8 +6,9 @@ build-backend = "hatchling.build"
 name = "lightspeed-to-dataverse-exporter"
 version = "0.1.0"
 description = "Export Lightspeed data to Dataverse ingress service"
-authors = [
-    {name = "Ondrej Metelka", email = "ometelka@redhat.com"}
+authors = []
+maintainers = [
+    {email = "ometelka@redhat.com", name = "Ondrej Metelka"},
 ]
 readme = "README.md"
 requires-python = ">=3.12"
