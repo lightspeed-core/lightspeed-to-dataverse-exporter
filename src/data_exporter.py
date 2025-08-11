@@ -136,55 +136,121 @@ class DataCollectorService:
             self.file_handler.delete_collected_files(data_chunk)
 
     def run(self) -> None:
-        """Run the periodic data collection loop."""
+        """Run the data collection service.
+
+        This method determines the operating mode and delegates to the appropriate handler:
+
+        - **Single-shot mode**: Execute one collection cycle and exit
+        - **Continuous mode**: Run periodic collection loop with graceful shutdown support
+
+        The method logs service configuration and handles mode detection based on
+        whether a collection interval is configured.
+        """
         logger.info("Starting data collection service")
+        logger.info("Data directory: %s", self.data_dir)
+        logger.info("Service ID: %s", self.config.service_id)
+        logger.info("Identity ID: %s", self.config.identity_id)
 
         in_single_shot_mode = not self.collection_interval
         if in_single_shot_mode:
             logger.info(
                 "Collection interval is not set, operating in single-shot mode - service will exit after one data collection cycle"
             )
+        else:
+            logger.info("Collection interval: %d seconds", self.collection_interval)
 
+        if in_single_shot_mode:
+            self._run_single_shot()
+        else:
+            self._run_continuous()
+
+    def _run_single_shot(self) -> None:
+        """Execute single-shot data collection."""
+        try:
+            logger.info("Starting data collection")
+            self._process_data_collection()
+            logger.info("Single-shot mode completed, exiting")
+        except KeyboardInterrupt:
+            logger.info("Data collection service stopped by user")
+        except (OSError, requests.RequestException) as e:
+            logger.error("Error during data collection: %s", e, exc_info=True)
+            logger.error("Single-shot mode failed, exiting with error")
+            # Let the exception cause the service to quit with a non-zero exit code. This
+            # will indicate to the external job runner that the run failed and it can choose
+            # whatever retry policy it wants.
+            raise e
+
+    def _run_continuous(self) -> None:
+        """Execute continuous data collection loop.
+
+        Runs periodic data collection until shutdown is requested. Performs a final
+        collection before shutdown for graceful termination (SIGTERM), but skips it
+        for user interrupts (Ctrl+C) to allow immediate exit.
+        """
+        user_interrupted = False
+
+        # Main collection loop
         while not self.shutdown_event.is_set():
             try:
+                logger.info("Starting data collection")
+
+                # Calculate timing to maintain consistent intervals
                 next_collection = time.time() + self.collection_interval
-
                 self._process_data_collection()
-
-                if in_single_shot_mode:
-                    return
-
-                logger.info(
-                    "Waiting %d seconds before next collection",
-                    self.collection_interval,
-                )
 
                 time_to_wait = next_collection - time.time()
                 if time_to_wait > 0:
-                    _ = self.shutdown_event.wait(time_to_wait)
+                    logger.info(
+                        "Collection completed, waiting %.1f seconds before next collection",
+                        time_to_wait,
+                    )
+                    if self.shutdown_event.wait(time_to_wait):
+                        # Shutdown was requested during wait
+                        logger.info(
+                            "Shutdown requested during wait, breaking collection loop"
+                        )
+                        break
+                else:
+                    logger.warning(
+                        "Collection took longer than interval (%.1f seconds overtime), starting next collection immediately",
+                        abs(time_to_wait),
+                    )
+                    continue
+
             except KeyboardInterrupt:
                 logger.info("Data collection service stopped by user")
+                user_interrupted = True
                 break
             except (OSError, requests.RequestException) as e:
-                logger.error("Error during collection process: %s", e, exc_info=True)
+                logger.error("Error during data collection: %s", e, exc_info=True)
 
-                if in_single_shot_mode:
-                    # Let the exception cause the service to quit with a non-zero exit code. This
-                    # will indicate to the external job runner that the run failed and it can choose
-                    # whatever retry policy it wants.
-                    raise e
-
+                # Retry logic with shutdown awareness
                 if not self.shutdown_event.is_set():
-                    logger.info("Retrying in %d seconds...", self.retry_interval)
-                    _ = self.shutdown_event.wait(self.retry_interval)
+                    logger.info(
+                        "Retrying data collection in %d seconds...", self.retry_interval
+                    )
+                    if self.shutdown_event.wait(self.retry_interval):
+                        # Shutdown was requested during retry wait
+                        logger.info(
+                            "Shutdown requested during retry wait, breaking collection loop"
+                        )
+                        break
+                else:
+                    logger.info(
+                        "Shutdown requested, skipping retry and exiting collection loop"
+                    )
+                    break
 
-        logger.info("Doing one final collection before shutdown")
-        # Exceptions (other than KeyboardInterrupt) here should bubble up because they indicate
-        # there is data that potentially will not be sent before the process terminates.
-        try:
-            self._process_data_collection()
-        except KeyboardInterrupt:
-            pass
+        # Only perform final collection for graceful shutdowns, not user interrupts
+        if not user_interrupted:
+            logger.info("Performing final collection before shutdown")
+            # Exceptions (other than KeyboardInterrupt) here should bubble up because they indicate
+            # there is data that potentially will not be sent before the process terminates.
+            try:
+                self._process_data_collection()
+            except KeyboardInterrupt:
+                logger.info("Final collection interrupted by user")
+                pass
 
     def shutdown(self) -> None:
         self.shutdown_event.set()
