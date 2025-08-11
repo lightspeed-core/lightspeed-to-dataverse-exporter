@@ -1,13 +1,11 @@
-name: Build image for PR and push it to Quay.io
+name: Build and validate image for PR
 
 on:
   - pull_request
 
 env:
   IMAGE_NAME: lightspeed-to-dataverse-exporter
-  IMAGE_NAMESPACE: lightspeed-core
-  IMAGE_REGISTRY: quay.io
-  LATEST_TAG: pr-latest
+  LATEST_TAG: pr-build
   CONTAINER_FILE: Containerfile
 
 jobs:
@@ -15,8 +13,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      # Required for image pushing to a registry
-      packages: write
     steps:
       - name: Install qemu and buildah
         run: |
@@ -45,11 +41,9 @@ jobs:
         run: |
           set -x
           buildah manifest inspect ${{ steps.build_image.outputs.image }}:${{ env.LATEST_TAG }}
-      - name: Push image to Quay.io
-        uses: redhat-actions/push-to-registry@v2
-        with:
-          image: ${{ steps.build_image.outputs.image }}
-          tags: ${{ steps.build_image.outputs.tags }}
-          registry: ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAMESPACE }}
-          username: ${{ secrets.QUAY_REGISTRY_USERNAME }}
-          password: ${{ secrets.QUAY_REGISTRY_PASSWORD }}
+      - name: Validate image build
+        run: |
+          echo "✅ Image built successfully for PR validation"
+          echo "Image: ${{ steps.build_image.outputs.image }}"
+          echo "Tags: ${{ steps.build_image.outputs.tags }}"
+          echo "Note: Image is not pushed to registry for security reasons"

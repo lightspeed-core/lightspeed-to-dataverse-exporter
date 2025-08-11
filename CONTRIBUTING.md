@@ -16,10 +16,14 @@ All images are pushed to: `quay.io/lightspeed-core/lightspeed-to-dataverse-expor
 
 **Trigger:** When a pull request is opened or updated
 
-**Tags:**
-- `pr-latest`
+**Process:**
+- Builds multi-architecture images (amd64, arm64) for validation
+- Uses Buildah for container builds
+- **Does NOT push to registry** (security best practice)
+- Validates that the Containerfile builds successfully
+- Ensures PR changes don't break the build process
 
-**Image Location:** `quay.io/lightspeed-core/lightspeed-to-dataverse-exporter:pr-latest`
+**Security Note:** PR builds only validate the container build process and do not push images to the registry to prevent potential security risks from untrusted code.
 
 #### 2. Main Branch Builds (`.github/workflows/build_and_push_main.yaml`)
 
@@ -55,10 +59,10 @@ All builds support both `amd64` and `arm64` architectures.
    - Create a feature branch from `main`
    - Make your changes
    - Open a pull request
-   - PR build creates `pr-latest` image for testing
+   - PR build validates that the container builds successfully (no image is pushed)
 
 2. **Testing:**
-   - Use the `pr-latest` image to test your changes
+   - Build and test the container locally using `make build` and `make run-container`
    - Ensure all tests pass and code quality checks succeed
 
 3. **Merge to Main:**
