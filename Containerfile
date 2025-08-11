@@ -7,6 +7,11 @@ ENV UV_COMPILE_BYTECODE=0 \
     UV_LINK_MODE=copy \
     UV_PYTHON_DOWNLOADS=0
 
+# Create app directory with proper permissions
+USER root
+RUN mkdir -p /app-root && chown -R 1001:1001 /app-root
+USER 1001
+
 WORKDIR /app-root
 
 # Install uv package manager
