@@ -73,6 +73,33 @@ All builds support both `amd64` and `arm64` architectures.
    - Create and push a git tag
    - Release build creates versioned and `latest` images
 
+## Local Development
+
+You can build and test the container locally using the provided Makefile:
+
+```bash
+# Build the container image
+make build
+
+# Run the container locally (requires configuration)
+# First, create a config file based on the example:
+cp config.yaml.example config.yaml
+# Edit config.yaml with your settings, then:
+podman run --rm -v $(PWD):/config lightspeed-exporter --config /config/config.yaml
+```
+
+**Known Issue - WSL2/Podman Permission Error:** If you encounter permission errors when building with Podman (particularly in WSL2 environments), you can use Docker instead:
+
+```bash
+# Alternative build command using Docker
+docker build -f Containerfile -t lightspeed-exporter .
+
+# Alternative run command using Docker
+docker run --rm -v $(PWD):/config lightspeed-exporter --config /config/config.yaml
+```
+
+This is a known issue with certain local environments and the UBI9 Python minimal base image. The GitHub Actions workflows use Buildah and work correctly in the CI environment.
+
 ## Code Quality
 
 Before contributing, ensure your code meets our quality standards:
