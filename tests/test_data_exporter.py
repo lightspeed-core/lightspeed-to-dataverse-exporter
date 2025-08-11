@@ -320,7 +320,7 @@ class TestDataCollectorServiceRun:
             # Should log error and retry
             mock_logger.error.assert_called()
             error_call = mock_logger.error.call_args[0]
-            assert "Error during collection process" in error_call[0]
+            assert "Error during data collection" in error_call[0]
 
     @patch("src.file_handler.FileHandler.collect_files")
     @patch("src.data_exporter.logger")
@@ -342,7 +342,7 @@ class TestDataCollectorServiceRun:
             # Should log error about the exception
             mock_logger.error.assert_called()
             error_call = mock_logger.error.call_args[0]
-            assert "Error during collection process" in error_call[0]
+            assert "Error during data collection" in error_call[0]
 
     @patch("src.file_handler.FileHandler.collect_files")
     def test_run_handles_request_exception_in_single_shot_mode(self, mock_collect):
@@ -402,5 +402,5 @@ class TestDataCollectorServiceRun:
 
                 # Verify the log message includes the correct interval
                 mock_logger.info.assert_any_call(
-                    "Retrying in %d seconds...", custom_retry_interval
+                    "Retrying data collection in %d seconds...", custom_retry_interval
                 )

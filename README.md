@@ -61,6 +61,8 @@ The service supports two authentication modes and two execution modes:
 - Runs indefinitely, collecting data at regular intervals
 - Set `collection_interval` to a positive number of seconds
 - Suitable for daemon-style deployments
+- Supports graceful shutdown (SIGTERM) with final data collection
+- Responds immediately to user interrupts (Ctrl+C) without final collection
 
 **Single-Shot Mode**:
 - Performs one data collection cycle and exits
@@ -141,5 +143,7 @@ podman run --rm \
 ## Documentation
 
 - **[ONBOARDING.md](ONBOARDING.md)** - Complete setup and testing guide
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** - Service architecture and logic flow
+- **[CONTRIBUTING.md](CONTRIBUTING.md)** - Contributing guide
 - **[examples/README.md](examples/README.md)** - Kubernetes deployment examples
 
