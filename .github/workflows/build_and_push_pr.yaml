@@ -6,6 +6,7 @@ on:
 env:
   IMAGE_NAME: lightspeed-to-dataverse-exporter
   IMAGE_NAMESPACE: lightspeed-core
+  IMAGE_REGISTRY: quay.io
   LATEST_TAG: pr-latest
   CONTAINER_FILE: Containerfile
 
