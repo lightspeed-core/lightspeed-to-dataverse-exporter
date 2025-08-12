@@ -2,14 +2,15 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: lightspeed-exporter-config-prod
-  namespace: lsdv-exporter
+  name: lightspeed-config
+  namespace: lightspeed
 data:
-  config.yaml: |
-    # Production environment configuration - uses openshift mode with cluster auth
-    data_dir: "/data"
-    service_id: "ols"
+  exporter-config.yaml: |
+    service_id: "<MY SERVICE ID>"
     ingress_server_url: "https://console.redhat.com/api/ingress/v1/upload"
+    allowed_subdirs:
+     - feedback
+     - transcripts
     
     # Collection settings
     collection_interval: 7200  # 2 hours (default production interval)
@@ -30,3 +31,10 @@ data:
       "sentiment": 1,
       "user_feedback": ""
     } 
+
+  # General lightspeed config
+  lightspeed-stack.yaml: |
+    name: "<MY LIGHTSPEED DEPLOYMENT NAME>"
+    service:
+      host: 0.0.0.0
+      port: 8090
