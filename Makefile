@@ -32,9 +32,6 @@ check: format lint test ## Run all code quality checks
 build: ## Build the project
 	podman build -t lightspeed-exporter .
 
-run-container: ## Run the container
-	podman run --rm -v $(PWD)/dev:/config lightspeed-exporter --config /config/config.yaml
-
 build-and-push: ## Build and push container to registry
 	./examples/build-and-push.sh
 
