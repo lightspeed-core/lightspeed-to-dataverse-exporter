@@ -1,5 +1,58 @@
 # Architecture Documentation
 
+## System Architecture
+
+The following diagram shows the overall system architecture and data flow:
+
+```mermaid
+---
+config:
+  layout: dagre
+---
+flowchart TD
+ subgraph Clients["Clients"]
+        A1["Lightspeed Client 1"]
+        A2["Lightspeed Client 2"]
+        A3["Lightspeed Client N"]
+  end
+ subgraph Cloud["Cloud: c.r.c"]
+        API["API Endpoint: Ingress"]
+        S3[("S3 Bucket")]
+        SQS[/"AWS SQS (Queue)"/]
+  end
+ subgraph MP_Plus["Cluster: MP+"]
+        W1["Worker 1"]
+        W2["Worker 2"]
+        W3["Worker N"]
+  end
+ subgraph Snowflake["Snowflake"]
+        EXT[("External Stage")]
+        PIPE["Snowpipe"]
+        DB_RAW[("snowpipe_db")]
+        DB_TARGET[("lightspeedarchives_db<br/>(SADP - Raw Data)")]
+  end
+ subgraph Astro["Astro (Airflow)"]
+        SCHED["Astro Scheduler"]
+        DBT["Dbt Transformations"]
+  end
+    API --> S3
+    S3 -- Put Object event --> SQS
+    A1 --> API
+    A2 --> API
+    A3 --> API
+    SQS --> W1 & W2 & W3
+    W1 --> EXT
+    W2 --> EXT
+    W3 --> EXT
+    EXT --> PIPE
+    PIPE --> DB_RAW
+    SCHED --> DBT
+    DB_RAW --> DBT
+    DBT --> DB_TARGET
+```
+
+**Note**: In Dataverse terminology, the `lightspeedarchives_db` serves as a **SADP (Source-Aligned Data Product)** - it contains all raw data from the source system. Client-specific **Aggregate Products** are created through DBT views that partition and filter this data by client/identifier, providing tailored access without duplicating the underlying data.
+
 ## Service Logic Flow
 
 The Data Collection Service implements a robust flow with clear separation between single-shot and continuous operation modes.

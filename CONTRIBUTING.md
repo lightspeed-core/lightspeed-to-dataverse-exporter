@@ -62,7 +62,7 @@ All builds support both `amd64` and `arm64` architectures.
    - PR build validates that the container builds successfully (no image is pushed)
 
 2. **Testing:**
-   - Build and test the container locally using `make build` and `make run-container`
+   - Build and test the container locally (see Local Development section below)
    - Ensure all tests pass and code quality checks succeed
 
 3. **Merge to Main:**
@@ -75,8 +75,29 @@ All builds support both `amd64` and `arm64` architectures.
 
 ## Local Development
 
-You can build and test the container locally using the provided Makefile:
+### Prerequisites
 
+```bash
+# Install dependencies
+uv sync --group dev
+```
+
+### Running Locally
+
+**Option 1: Direct Python execution**
+```bash
+# Create config from example
+cp config.yaml.example config.yaml
+# Edit config.yaml with your settings
+
+# Run in single-shot mode
+uv run python -m src.main --config config.yaml --collection-interval 0
+
+# Run with debug logging
+uv run python -m src.main --config config.yaml --log-level DEBUG
+```
+
+**Option 2: Container execution**
 ```bash
 # Build the container image
 make build
@@ -99,6 +120,20 @@ docker run --rm -v $(PWD):/config lightspeed-exporter --config /config/config.ya
 ```
 
 This is a known issue with certain local environments and the UBI9 Python minimal base image. The GitHub Actions workflows use Buildah and work correctly in the CI environment.
+
+### Authentication for Local Testing
+
+**Manual Mode** (for local development):
+```bash
+uv run python -m src.main --mode manual --config config.yaml \
+  --ingress-server-auth-token YOUR_TOKEN \
+  --identity-id YOUR_IDENTITY
+```
+
+Use `scripts/ingress_token_from_offline_token.py` to generate tokens for stage testing:
+```bash
+python scripts/ingress_token_from_offline_token.py --offline-token <offline-token> --env stage
+```
 
 ## Code Quality
 
