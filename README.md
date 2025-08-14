@@ -125,25 +125,25 @@ data/
 
 **Note:** Files in other directories are ignored. The service recursively scans for `*.json` files only.
 
-## Container Deployment
-
-### Build and Run Locally
+## Container Usage
 
 ```bash
-# Build container
+# Build container locally
 make build
 
-# Run with config and data mounted
+# Run with mounted config and data
 podman run --rm \
   -v ./config.yaml:/config/config.yaml \
   -v ./data:/data \
   lightspeed-exporter --config /config/config.yaml
 ```
 
+For detailed deployment options see [DEPLOYMENT.md](DEPLOYMENT.md).
+
 ## Documentation
 
 - **[ONBOARDING.md](ONBOARDING.md)** - Complete setup and testing guide
-- **[ARCHITECTURE.md](ARCHITECTURE.md)** - Service architecture and logic flow
-- **[CONTRIBUTING.md](CONTRIBUTING.md)** - Contributing guide
-- **[examples/README.md](examples/README.md)** - Kubernetes deployment examples
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** - System architecture and service logic flow  
+- **[CONTRIBUTING.md](CONTRIBUTING.md)** - Development workflow and local setup
+- **[DEPLOYMENT.md](DEPLOYMENT.md)** - Kubernetes/OpenShift deployment patterns (Jobs, CronJobs, Sidecars)
 

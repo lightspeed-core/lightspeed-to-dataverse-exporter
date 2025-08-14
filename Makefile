@@ -1,4 +1,4 @@
-.PHONY: help install install-dev format lint test test-cov check build run-container build-and-push deploy-stage clean-stage
+.PHONY: help install install-dev format lint test test-cov check build run-container build-and-push deploy clean-deployment-stage
 
 # Default target
 help: ## Show this help message
@@ -36,11 +36,11 @@ build-and-push: ## Build and push container to registry
 	./examples/build-and-push.sh
 
 # OpenShift Deployment - Stage Environment
-deploy-stage: build-and-push ## Deploy to stage environment
+deploy: build-and-push ## Deploy to stage environment
 	oc apply -f examples/kubernetes/namespace.yaml
 	oc apply -f examples/kubernetes/rbac.yaml
-	oc apply -f examples/kubernetes/configmap-stage.yaml
-	oc apply -f examples/kubernetes/job-stage.yaml
+	oc apply -f examples/kubernetes/configmap.yaml
+	oc apply -f examples/kubernetes/deployment.yaml
 
-clean-stage: ## Remove stage deployment
+clean-deployment-stage: ## Remove stage deployment
 	oc delete -f examples/kubernetes/ || true
