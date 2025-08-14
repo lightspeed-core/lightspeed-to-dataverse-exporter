@@ -1,0 +1,104 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: lightspeed-with-exporter
+  namespace: lightspeed
+  labels:
+    app: lightspeed-with-exporter
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: lightspeed-with-exporter
+  template:
+    metadata:
+      labels:
+        app: lightspeed-with-exporter
+    spec:
+      serviceAccountName: lightspeed-with-exporter
+      containers:
+      - name: lightspeed-stack
+        image: quay.io/lightspeed-core/lightspeed-stack:latest
+        imagePullPolicy: Always
+        ports:
+        - name: http
+          containerPort: 8090
+          protocol: TCP
+        resources:
+          limits:
+            memory: 2Gi
+            cpu: 1
+          requests:
+            memory: 2Gi
+            cpu: 1
+        volumeMounts:
+        - name: lightspeed-config
+          mountPath: /app-root/lightspeed-stack.yaml
+          subPath: lightspeed-stack.yaml
+          readOnly: true
+        - name: data-storage
+          mountPath: /tmp/data
+        livenessProbe:
+          httpGet:
+            path: /liveness
+            port: 8090
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 2
+        readinessProbe:
+          httpGet:
+            path: /readiness
+            port: 8090
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 2
+
+      - name: lightspeed-to-dataverse-exporter
+        image: quay.io/lightspeed-core/lightspeed-to-dataverse-exporter:dev-latest
+        imagePullPolicy: Always
+        args:
+        # This will use the pod pull secret to obtain a token and is recommended for prod deployments
+        - "--mode"
+        - "openshift"
+        - "--config"
+        - "/etc/config/config.yaml"
+        - "--log-level"
+        - "INFO"
+        - "--data-dir"
+        - "/tmp/data"
+        #env:
+        # If using 'manual' mode auth, this should be used along with a secret with the auth token
+        #- name: INGRESS_SERVER_AUTH_TOKEN
+        #  valueFrom:
+        #    secretKeyRef:
+        #      name: ingress-auth
+        #      key: auth_token
+        #      optional: true
+        resources:
+          limits:
+            memory: "512Mi"
+            cpu: "200m"
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+        volumeMounts:
+          - name: lightspeed-config
+            mountPath: /etc/config/config.yaml
+            subPath: exporter-config.yaml
+            readOnly: true
+          - name: data-storage
+            mountPath: /tmp/data
+          # Uncomment these lines to get some sample data for use when testing
+          #- name: lightspeed-config
+          #  subPath: sample-lightspeed-data.json
+          #  mountPath: /tmp/data/feedback/sample.json
+          #  readOnly: true
+
+      volumes:
+      - name: lightspeed-config
+        configMap:
+          name: lightspeed-config
+      # This is shared between the lightspeed service and the exporter sidecar
+      - name: data-storage
+        emptyDir: {}
+

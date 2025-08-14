@@ -2,7 +2,7 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: lsdv-exporter
+  name: lightspeed
   labels:
-    name: lsdv-exporter
-    app.kubernetes.io/name: lightspeed-dataverse-exporter 
+    name: lightspeed
+    app.kubernetes.io/name: lightspeed
