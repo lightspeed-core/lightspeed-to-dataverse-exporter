@@ -61,7 +61,7 @@ class TestDataCollectorSettings:
             assert "greater_than" in str(exc_info.value)
 
     def test_zero_collection_interval(self):
-        """Test validation error for negative collection interval."""
+        """Test validation error for zero collection interval."""
         with tempfile.TemporaryDirectory() as tmpdir:
             DataCollectorSettings(
                 data_dir=Path(tmpdir),

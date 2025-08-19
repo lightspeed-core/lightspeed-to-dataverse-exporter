@@ -3,9 +3,12 @@
 import base64
 from unittest.mock import Mock, patch
 
+import jwt
 import kubernetes
 import pytest
+import requests_mock
 
+from src.auth.providers.sso import SSOServiceAccountAuthProvider
 from src.auth.providers import AuthProvider, AuthenticationError, OpenShiftAuthProvider
 from src.auth.providers.openshift import (
     ClusterIDNotFoundError,
@@ -205,3 +208,86 @@ class TestOpenShiftAuthProvider:
             provider.get_identity_id()
 
         assert "Cannot access cluster version" in str(exc_info.value)
+
+
+class TestSSOServiceAccountAuthProvider:
+    def test_sso_auth(self, requests_mock: requests_mock.Mocker):
+        client_id = "test-client-id"
+        client_secret = "test-client_secret"
+        expected_token = "token123"
+
+        sso_token = jwt.encode({"preferred_username": "test-user"}, key="test")
+
+        requests_mock.post(
+            "https://sso.redhat.com/auth/realms/redhat-external/protocol/openid-connect/token",
+            json={"access_token": sso_token},
+            additional_matcher=(
+                lambda req: client_id in req.text
+                and client_secret in req.text
+                and "client_credentials" in req.text
+            ),
+        )
+
+        requests_mock.post(
+            "https://api.openshift.com/api/accounts_mgmt/v1/access_token",
+            headers={"Authorization": f"Bearer {sso_token}"},
+            json={
+                "auths": {
+                    "cloud.openshift.com": {
+                        "auth": expected_token,
+                    }
+                }
+            },
+        )
+
+        provider = SSOServiceAccountAuthProvider(
+            client_id=client_id, client_secret=client_secret
+        )
+
+        actual_token, actual_identity_id = provider.get_credentials()
+        assert actual_token == expected_token
+        assert actual_identity_id == "test-user"
+
+    def test_bad_sso_credentials(self, requests_mock: requests_mock.Mocker):
+        client_id = "test-client-id"
+        client_secret = "test-client_secret"
+
+        requests_mock.post(
+            "https://sso.redhat.com/auth/realms/redhat-external/protocol/openid-connect/token",
+            status_code=401,
+        )
+
+        provider = SSOServiceAccountAuthProvider(
+            client_id=client_id, client_secret=client_secret
+        )
+
+        with pytest.raises(AuthenticationError):
+            _, _ = provider.get_credentials()
+
+    def test_bad_api_credentials(self, requests_mock: requests_mock.Mocker):
+        client_id = "test-client-id"
+        client_secret = "test-client_secret"
+
+        sso_token = jwt.encode({"preferred_username": "test-user"}, key="test")
+
+        requests_mock.post(
+            "https://sso.redhat.com/auth/realms/redhat-external/protocol/openid-connect/token",
+            json={"access_token": sso_token},
+            additional_matcher=(
+                lambda req: client_id in req.text
+                and client_secret in req.text
+                and "client_credentials" in req.text
+            ),
+        )
+
+        requests_mock.post(
+            "https://api.openshift.com/api/accounts_mgmt/v1/access_token",
+            status_code=403,
+        )
+
+        provider = SSOServiceAccountAuthProvider(
+            client_id=client_id, client_secret=client_secret
+        )
+
+        with pytest.raises(AuthenticationError):
+            _, _ = provider.get_credentials()

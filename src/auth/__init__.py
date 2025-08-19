@@ -2,7 +2,7 @@
 
 from typing import Literal
 
-AuthMode = Literal["openshift", "manual"]
+AuthMode = Literal["openshift", "manual", "sso"]
 
 __all__ = [
     "AuthMode",

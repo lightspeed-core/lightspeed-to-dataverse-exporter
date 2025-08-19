@@ -525,7 +525,7 @@ class TestMain:
         mock_configure_logging,
         mock_parse_args,
     ):
-        """Test that environment variable takes precedence over config file."""
+        """Test that config defaults take effect when not specified in other sources."""
         mock_args = Mock()
         # Required fields for manual mode
         mock_args.mode = "manual"

@@ -13,7 +13,7 @@ from pydantic import ValidationError
 
 from src import constants
 from src.auth import AuthMode
-from src.auth.providers import OpenShiftAuthProvider
+from src.auth.providers import OpenShiftAuthProvider, SSOServiceAccountAuthProvider
 from src.settings import DataCollectorSettings
 from src.data_exporter import DataCollectorService
 from src.auth.providers import AuthenticationError
@@ -52,7 +52,7 @@ def parse_args() -> Args:
         "--mode",
         choices=get_args(AuthMode),
         default="manual",
-        help="Authentication mode: 'openshift' (OpenShift cluster auth), 'manual' (explicit credentials)",
+        help="Authentication mode: 'openshift' (OpenShift cluster auth), 'sso' (RedHat SSO auth), 'manual' (explicit credentials)",
     )
 
     parser.add_argument(
@@ -129,6 +129,16 @@ def parse_args() -> Args:
         "--rich-logs",
         action="store_true",
         help="Enable rich colored logging output",
+    )
+
+    parser.add_argument(
+        "--client-id",
+        help="SSO Client ID (only when using 'sso' auth). Also accepted in the CLIENT_ID envvar.",
+    )
+
+    parser.add_argument(
+        "--client-secret",
+        help="SSO Client secret value (only when using 'sso' auth). Also accepted in the CLIENT_SECRET envvar.",
     )
 
     return cast(Args, parser.parse_args())
@@ -211,6 +221,23 @@ def main() -> int:
         if args.mode != "manual":
             if args.mode == "openshift":
                 provider = OpenShiftAuthProvider()
+            elif args.mode == "sso":
+                client_id = args.client_id or environ.get("CLIENT_ID")
+                client_secret = args.client_secret or environ.get("CLIENT_SECRET")
+
+                if not client_id or not client_secret:
+                    logging.error(
+                        "Must specify client id and secret when using sso auth"
+                    )
+                    sys.exit(1)
+
+                provider = SSOServiceAccountAuthProvider(
+                    client_id=client_id,
+                    client_secret=client_secret,
+                    identity_id=args.identity_id,
+                    # Just expose this via envvar since it is not really for prod use
+                    env="stage" if environ.get("USE_SSO_STAGE") is not None else "prod",
+                )
             else:
                 logger.error(f"Invalid auth mode: {args.mode}")
                 sys.exit(1)
@@ -290,6 +317,10 @@ def main() -> int:
         if args.mode == "openshift":
             logger.info(
                 "Ensure the application is running in an OpenShift cluster with proper permissions"
+            )
+        elif args.mode == "sso":
+            logger.info(
+                "Ensure CLIENT_ID and CLIENT_SECRET envvars are set to valid SSO service account credentials"
             )
         elif args.mode == "manual":
             logger.info("Provide valid --ingress-server-auth-token and --identity-id")
