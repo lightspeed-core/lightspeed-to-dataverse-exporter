@@ -171,12 +171,12 @@ class TestMain:
         new_callable=mock_open,
         read_data="data_dir: /tmp\nservice_id: config-service\ningress_server_url: https://config.example.com\nidentity_id: config-identity\ncollection_interval: 300\ningress_connection_timeout: 30\ncleanup_after_send: true",
     )
-    @patch("src.main.get_auth_credentials")
+    @patch("src.main.OpenShiftAuthProvider")
     @patch("src.main.DataCollectorService")
     def test_main_with_config_file_openshift_mode(
         self,
         mock_service_class,
-        mock_get_auth,
+        mock_auth_provider,
         mock_open_file,
         mock_configure_logging,
         mock_parse_args,
@@ -200,7 +200,12 @@ class TestMain:
         mock_args.retry_interval = None
         mock_parse_args.return_value = mock_args
 
-        mock_get_auth.return_value = ("openshift-token", "openshift-identity")
+        mock_provider = Mock()
+        mock_auth_provider.return_value = mock_provider
+        mock_provider.get_credentials.return_value = (
+            "openshift-token",
+            "openshift-identity",
+        )
 
         mock_service = Mock()
         mock_service_class.return_value = mock_service
@@ -212,9 +217,7 @@ class TestMain:
         mock_open_file.assert_called_once_with(
             Path("/config.yaml"), "r", encoding="utf-8"
         )
-        mock_get_auth.assert_called_once_with(
-            mode="openshift", auth_token=None, identity_id="config-identity"
-        )
+        mock_provider.get_credentials.assert_called_once()
         mock_service.run.assert_called_once()
 
         # Verify DataCollectorService was called with DataCollectorSettings
@@ -227,10 +230,9 @@ class TestMain:
 
     @patch("src.main.parse_args")
     @patch("src.main.configure_logging")
-    @patch("src.main.get_auth_credentials")
     @patch("src.main.DataCollectorService")
     def test_main_without_config_manual_mode(
-        self, mock_service_class, mock_get_auth, mock_configure_logging, mock_parse_args
+        self, mock_service_class, mock_configure_logging, mock_parse_args
     ):
         """Test main function without config file in manual mode."""
         # Setup mocks
@@ -251,8 +253,6 @@ class TestMain:
         mock_args.retry_interval = None
         mock_parse_args.return_value = mock_args
 
-        mock_get_auth.return_value = ("test-token", "test-identity")
-
         mock_service = Mock()
         mock_service_class.return_value = mock_service
 
@@ -265,9 +265,6 @@ class TestMain:
         created_settings = mock_service_class.call_args[0][0]
         assert isinstance(created_settings, DataCollectorSettings)
         mock_configure_logging.assert_called_once_with("DEBUG", mock_args.rich_logs)
-        mock_get_auth.assert_called_once_with(
-            mode="manual", auth_token="test-token", identity_id="test-identity"
-        )
         mock_service.run.assert_called_once()
 
     @patch("src.main.parse_args")
@@ -293,16 +290,15 @@ class TestMain:
         mock_args.retry_interval = None
         mock_parse_args.return_value = mock_args
 
-        with pytest.raises(SystemExit) as exc_info:
-            main()
+        code = main()
 
-        assert exc_info.value.code == 1
+        assert code == 1
 
     @patch("src.main.parse_args")
     @patch("src.main.configure_logging")
-    @patch("src.main.get_auth_credentials")
+    @patch("src.main.OpenShiftAuthProvider")
     def test_main_authentication_error(
-        self, mock_get_auth, mock_configure_logging, mock_parse_args
+        self, mock_auth_provider, mock_configure_logging, mock_parse_args
     ):
         """Test main function with authentication error."""
         mock_args = Mock()
@@ -322,9 +318,11 @@ class TestMain:
         mock_args.retry_interval = None
         mock_parse_args.return_value = mock_args
 
-        from src.auth import AuthenticationError
+        from src.auth.providers import AuthenticationError
 
-        mock_get_auth.side_effect = AuthenticationError("Auth failed")
+        mock_auth_provider.get_credentials.side_effect = AuthenticationError(
+            "Auth failed"
+        )
 
         result = main()
 
@@ -332,10 +330,9 @@ class TestMain:
 
     @patch("src.main.parse_args")
     @patch("src.main.configure_logging")
-    @patch("src.main.get_auth_credentials")
     @patch("src.main.DataCollectorService")
     def test_main_keyboard_interrupt(
-        self, mock_service_class, mock_get_auth, mock_configure_logging, mock_parse_args
+        self, mock_service_class, mock_configure_logging, mock_parse_args
     ):
         """Test main function handles KeyboardInterrupt gracefully."""
         mock_args = Mock()
@@ -355,8 +352,6 @@ class TestMain:
         mock_args.retry_interval = None
         mock_parse_args.return_value = mock_args
 
-        mock_get_auth.return_value = ("test-token", "test-identity")
-
         mock_service = Mock()
         mock_service.run.side_effect = KeyboardInterrupt()
         mock_service_class.return_value = mock_service
@@ -367,10 +362,9 @@ class TestMain:
 
     @patch("src.main.parse_args")
     @patch("src.main.configure_logging")
-    @patch("src.main.get_auth_credentials")
     @patch("src.main.DataCollectorService")
     def test_main_unexpected_exception(
-        self, mock_service_class, mock_get_auth, mock_configure_logging, mock_parse_args
+        self, mock_service_class, mock_configure_logging, mock_parse_args
     ):
         """Test main function handles unexpected exceptions."""
         mock_args = Mock()
@@ -389,8 +383,6 @@ class TestMain:
         mock_args.allowed_subdirs = None
         mock_args.retry_interval = None
         mock_parse_args.return_value = mock_args
-
-        mock_get_auth.return_value = ("test-token", "test-identity")
 
         mock_service = Mock()
         mock_service.run.side_effect = Exception("Unexpected error")
@@ -522,3 +514,51 @@ class TestMain:
         mock_settings_class.assert_called_once()
         call_kwargs = mock_settings_class.call_args[1]
         assert call_kwargs["ingress_server_auth_token"] == "env-token"
+
+    @patch("src.main.parse_args")
+    @patch("src.main.configure_logging")
+    @patch("src.main.DataCollectorService")
+    @patch.dict("os.environ", {"INGRESS_SERVER_AUTH_TOKEN": "env-token"})
+    def test_main_config_defaults(
+        self,
+        mock_service_class,
+        mock_configure_logging,
+        mock_parse_args,
+    ):
+        """Test that environment variable takes precedence over config file."""
+        mock_args = Mock()
+        # Required fields for manual mode
+        mock_args.mode = "manual"
+        mock_args.config = None
+        mock_args.log_level = "INFO"
+        mock_args.data_dir = Path("/tmp")
+        mock_args.service_id = "test-service"
+        mock_args.ingress_server_url = "https://test.example.com"
+        # Minimal optional fields
+        mock_args.identity_id = None
+        mock_args.ingress_server_auth_token = "test-token"
+        mock_args.collection_interval = None
+        mock_args.ingress_connection_timeout = None
+        mock_args.no_cleanup = False
+        mock_args.rich_logs = False
+        mock_args.allowed_subdirs = None
+        mock_args.retry_interval = None
+        mock_parse_args.return_value = mock_args
+
+        mock_service = Mock()
+        mock_service_class.return_value = mock_service
+
+        result = main()
+
+        assert result == 0
+
+        mock_service_class.assert_called_once()
+        settings = mock_service_class.call_args[0][0]
+
+        # Check defaults
+        assert settings.identity_id == "lightspeed-exporter"
+        assert settings.collection_interval == 7200  # Default from constants
+        assert settings.cleanup_after_send is True
+        assert settings.ingress_connection_timeout == 30  # Default from constants
+        assert settings.retry_interval == 300  # Default from constants
+        assert settings.allowed_subdirs == []  # Default: collect everything

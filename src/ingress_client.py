@@ -89,9 +89,10 @@ class IngressClient:
         response = self._upload_data_to_ingress(tarball)
         if response.status_code != 202:
             logger.error(
-                "Posting payload failed, response: %d: %s",
+                "Posting payload failed, response: %d: %s (%s)",
                 response.status_code,
                 response.text,
+                response.headers,
             )
             raise requests.RequestException(
                 f"Data upload failed with response code: {response.status_code}"
