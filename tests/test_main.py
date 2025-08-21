@@ -198,6 +198,7 @@ class TestMain:
         mock_args.rich_logs = False
         mock_args.allowed_subdirs = None
         mock_args.retry_interval = None
+        mock_args.print_config_and_exit = False
         mock_parse_args.return_value = mock_args
 
         mock_provider = Mock()
@@ -251,6 +252,7 @@ class TestMain:
         mock_args.rich_logs = False
         mock_args.allowed_subdirs = None
         mock_args.retry_interval = None
+        mock_args.print_config_and_exit = False
         mock_parse_args.return_value = mock_args
 
         mock_service = Mock()
@@ -288,6 +290,7 @@ class TestMain:
         mock_args.rich_logs = False
         mock_args.allowed_subdirs = None
         mock_args.retry_interval = None
+        mock_args.print_config_and_exit = False
         mock_parse_args.return_value = mock_args
 
         code = main()
@@ -316,6 +319,7 @@ class TestMain:
         mock_args.rich_logs = False
         mock_args.allowed_subdirs = None
         mock_args.retry_interval = None
+        mock_args.print_config_and_exit = False
         mock_parse_args.return_value = mock_args
 
         from src.auth.providers import AuthenticationError
@@ -350,6 +354,7 @@ class TestMain:
         mock_args.rich_logs = False
         mock_args.allowed_subdirs = None
         mock_args.retry_interval = None
+        mock_args.print_config_and_exit = False
         mock_parse_args.return_value = mock_args
 
         mock_service = Mock()
@@ -382,6 +387,7 @@ class TestMain:
         mock_args.rich_logs = False
         mock_args.allowed_subdirs = None
         mock_args.retry_interval = None
+        mock_args.print_config_and_exit = False
         mock_parse_args.return_value = mock_args
 
         mock_service = Mock()
@@ -411,6 +417,7 @@ class TestMain:
         mock_args.rich_logs = False
         mock_args.allowed_subdirs = None
         mock_args.retry_interval = None
+        mock_args.print_config_and_exit = False
 
         # Apply any test-specific overrides
         for key, value in overrides.items():

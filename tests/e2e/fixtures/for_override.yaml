@@ -1,0 +1,6 @@
+service_id: "from-config"
+data_dir: "/tmp/test-data"
+ingress_server_url: "https://config.example.com"
+ingress_server_auth_token: "config-token"
+identity_id: "config-identity"
+collection_interval: 120

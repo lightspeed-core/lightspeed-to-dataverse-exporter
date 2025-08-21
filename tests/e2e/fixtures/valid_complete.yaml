@@ -1,0 +1,10 @@
+service_id: "test-service"
+data_dir: "/tmp/test-data"
+ingress_server_url: "https://test.example.com"
+ingress_server_auth_token: "test-token"
+identity_id: "test-identity"
+collection_interval: 60
+ingress_connection_timeout: 30
+retry_interval: 300
+cleanup_after_send: true
+allowed_subdirs: ["logs", "metrics"]
