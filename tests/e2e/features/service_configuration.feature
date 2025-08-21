@@ -7,7 +7,11 @@ Feature: Service configuration and validation
   Scenario: Running without any configuration
     When I run main.py without any config or arguments
     Then the exit code must be 1
-    And the log must contain: "Either provide --config with a YAML file or all required arguments"
+    And the log must contain: "Invalid config"
+    And the log must contain: "data_dir: Input is not a valid path"
+    And the log must contain: "service_id: Input should be a valid string (got None)"
+    And the log must contain: "ingress_server_url: Input should be a valid string (got None)"
+    And the log must contain: "ingress_server_auth_token: Input should be a valid string (got None)"
 
   Scenario: Valid config file with missing required fields
     Given I have a config file with content:
@@ -20,16 +24,17 @@ Feature: Service configuration and validation
     When I run main.py with this config file
     And I use the print-config-and-exit flag
     Then the exit code must be 1
-    And the log must contain: "Missing required configuration"
-    And the log must contain: "data-dir"
+    And the log must contain: "Invalid config"
+    And the log must contain: "data_dir: Input is not a valid path"
+    And the log must contain: "ingress_server_url: Input should be a valid string (got None)"
+    And the log must contain: "ingress_server_auth_token: Input should be a valid string (got None)"
 
   Scenario: Manual mode missing auth fields
     When I run main.py with args "--mode manual --data-dir /tmp --service-id test --ingress-server-url https://test.com"
     And I use the print-config-and-exit flag
     Then the exit code must be 1
-    And the log must contain: "Missing required configuration"
-    And the log must contain: "ingress-server-auth-token"
-    And the log must contain: "identity-id"
+    And the log must contain: "Invalid config"
+    And the log must contain: "ingress_server_auth_token: Input should be a valid string (got None)"
 
   # Configuration inspection scenarios
   Scenario: Valid complete config file inspection
@@ -78,10 +83,10 @@ Feature: Service configuration and validation
     When I run main.py with this config file
     And I use the print-config-and-exit flag
     Then the exit code must be 1
-    And the log must contain: "YAML parsing error"
+    And the log must contain: "ParserError"
 
   Scenario: Non-existent config file
     When I run main.py with config file "fixtures/nonexistent.yaml"
     And I use the print-config-and-exit flag
     Then the exit code must be 1
-    And the log must contain: "file not found error"
+    And the log must contain: "FileNotFoundError"

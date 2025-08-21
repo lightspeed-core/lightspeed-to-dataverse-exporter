@@ -8,7 +8,7 @@ import tempfile
 from pathlib import Path
 
 import pytest
-from pytest_bdd import given, when, then, scenarios
+from pytest_bdd import given, when, then, scenarios, parsers
 
 
 # Helper functions
@@ -378,52 +378,11 @@ def check_log_contains_file_not_found(command_result):
     )
 
 
-# Generic log checking step
-@then('the log must contain: "{expected_text}"')
-def check_log_contains_text(command_result, expected_text):
+# Generic log checking step - simple string matching
+@then(parsers.re(r'the log must contain: "(?P<expected_text>.*)"'))
+def check_log_contains_text_regex(command_result, expected_text):
     """Check that the log contains the expected text."""
     assert_log_contains(command_result, expected_text)
-
-
-# Specific steps for patterns with nested quotes (pytest-bdd requirement)
-@then(
-    'the log must contain: "Either provide --config with a YAML file or all required arguments"'
-)
-def check_log_contains_config_message(command_result):
-    assert_log_contains(
-        command_result,
-        "Either provide --config with a YAML file or all required arguments",
-    )
-
-
-@then('the log must contain: "Missing required configuration"')
-def check_log_contains_missing_config(command_result):
-    assert_log_contains(command_result, "Missing required configuration")
-
-
-@then('the log must contain: "data-dir"')
-def check_log_contains_data_dir(command_result):
-    assert_log_contains(command_result, "data-dir")
-
-
-@then('the log must contain: "ingress-server-auth-token"')
-def check_log_contains_auth_token(command_result):
-    assert_log_contains(command_result, "ingress-server-auth-token")
-
-
-@then('the log must contain: "identity-id"')
-def check_log_contains_identity_id(command_result):
-    assert_log_contains(command_result, "identity-id")
-
-
-@then('the log must contain: "Printing resolved configuration"')
-def check_log_contains_printing_config(command_result):
-    assert_log_contains(command_result, "Printing resolved configuration")
-
-
-@then('the log must contain: "Authentication failed"')
-def check_log_contains_auth_failed(command_result):
-    assert_log_contains(command_result, "Authentication failed")
 
 
 # Generic config checking step
