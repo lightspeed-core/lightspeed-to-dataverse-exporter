@@ -6,6 +6,7 @@ from unittest.mock import Mock, patch, mock_open
 
 from src.main import parse_args, main, configure_logging
 from src.settings import DataCollectorSettings
+from src.auth.providers import AuthenticationError
 
 
 class TestParseArgs:
@@ -198,6 +199,7 @@ class TestMain:
         mock_args.rich_logs = False
         mock_args.allowed_subdirs = None
         mock_args.retry_interval = None
+        mock_args.print_config_and_exit = False
         mock_parse_args.return_value = mock_args
 
         mock_provider = Mock()
@@ -251,6 +253,7 @@ class TestMain:
         mock_args.rich_logs = False
         mock_args.allowed_subdirs = None
         mock_args.retry_interval = None
+        mock_args.print_config_and_exit = False
         mock_parse_args.return_value = mock_args
 
         mock_service = Mock()
@@ -288,6 +291,7 @@ class TestMain:
         mock_args.rich_logs = False
         mock_args.allowed_subdirs = None
         mock_args.retry_interval = None
+        mock_args.print_config_and_exit = False
         mock_parse_args.return_value = mock_args
 
         code = main()
@@ -316,9 +320,8 @@ class TestMain:
         mock_args.rich_logs = False
         mock_args.allowed_subdirs = None
         mock_args.retry_interval = None
+        mock_args.print_config_and_exit = False
         mock_parse_args.return_value = mock_args
-
-        from src.auth.providers import AuthenticationError
 
         mock_auth_provider.get_credentials.side_effect = AuthenticationError(
             "Auth failed"
@@ -350,6 +353,7 @@ class TestMain:
         mock_args.rich_logs = False
         mock_args.allowed_subdirs = None
         mock_args.retry_interval = None
+        mock_args.print_config_and_exit = False
         mock_parse_args.return_value = mock_args
 
         mock_service = Mock()
@@ -382,6 +386,7 @@ class TestMain:
         mock_args.rich_logs = False
         mock_args.allowed_subdirs = None
         mock_args.retry_interval = None
+        mock_args.print_config_and_exit = False
         mock_parse_args.return_value = mock_args
 
         mock_service = Mock()
@@ -411,6 +416,7 @@ class TestMain:
         mock_args.rich_logs = False
         mock_args.allowed_subdirs = None
         mock_args.retry_interval = None
+        mock_args.print_config_and_exit = False
 
         # Apply any test-specific overrides
         for key, value in overrides.items():
@@ -543,6 +549,7 @@ class TestMain:
         mock_args.rich_logs = False
         mock_args.allowed_subdirs = None
         mock_args.retry_interval = None
+        mock_args.print_config_and_exit = False
         mock_parse_args.return_value = mock_args
 
         mock_service = Mock()

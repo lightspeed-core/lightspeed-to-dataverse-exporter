@@ -5,6 +5,8 @@ import argparse
 import logging
 import signal
 import sys
+import yaml
+import json
 from os import environ
 from pathlib import Path
 from typing import TypeVar, cast, get_args
@@ -141,6 +143,12 @@ def parse_args() -> Args:
         help="SSO Client secret value (only when using 'sso' auth). Also accepted in the CLIENT_SECRET envvar.",
     )
 
+    parser.add_argument(
+        "--print-config-and-exit",
+        action="store_true",
+        help="Print the resolved configuration as JSON and exit without running the service",
+    )
+
     return cast(Args, parser.parse_args())
 
 
@@ -246,8 +254,6 @@ def main() -> int:
 
         if args.config:
             logger.info("Loading configuration from %s", args.config)
-            import yaml
-
             with open(args.config, "r", encoding="utf-8") as f:
                 config_dict = yaml.safe_load(f)
 
@@ -294,6 +300,17 @@ def main() -> int:
                 args.allowed_subdirs, config_dict.get("allowed_subdirs"), []
             ),
         )
+
+        # If print-config-and-exit flag is set, output config and exit
+        if args.print_config_and_exit:
+            logger.info("Printing resolved configuration")
+            config_dict_clean = config.model_dump()
+            # Convert Path objects to strings for JSON serialization
+            for key, value in config_dict_clean.items():
+                if hasattr(value, "__fspath__"):  # Path-like object
+                    config_dict_clean[key] = str(value)
+            print(json.dumps(config_dict_clean, indent=2, sort_keys=True))
+            return 0
 
         service = DataCollectorService(config)
 

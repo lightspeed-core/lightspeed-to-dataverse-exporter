@@ -21,13 +21,18 @@ format: ## Format code with black
 lint: ## Run linting with ruff
 	uv run ruff check src/ tests/
 
-test: ## Run all tests
-	uv run pytest
+test: ## Run unit and integration tests (excludes BDD/E2E)
+	uv run pytest tests/ --ignore=tests/e2e/
 
-test-cov: ## Run tests with coverage report
-	uv run pytest --cov=src --cov-report=term-missing --cov-report=html
+test-bdd: ## Run BDD end-to-end tests
+	uv run pytest tests/e2e/ --gherkin-terminal-reporter -v
 
-check: format lint test ## Run all code quality checks
+test-cov: ## Run tests with coverage report (excludes BDD/E2E)
+	uv run pytest tests/ --ignore=tests/e2e/ --cov=src --cov-report=term-missing --cov-report=html
+
+check: format lint test ## Run all code quality checks (excludes BDD)
+
+check-all: format lint test test-bdd ## Run all code quality checks including BDD
 
 build: ## Build the project
 	podman build -t lightspeed-exporter .
