@@ -1,5 +1,5 @@
 service_id: "from-config"
-data_dir: "/tmp/test-data"
+data_dir: "/tmp"
 ingress_server_url: "https://config.example.com"
 ingress_server_auth_token: "config-token"
 identity_id: "config-identity"

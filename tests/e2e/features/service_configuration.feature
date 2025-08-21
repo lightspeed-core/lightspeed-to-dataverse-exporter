@@ -24,7 +24,7 @@ Feature: Service configuration and validation
     And the log must contain: "data-dir"
 
   Scenario: Manual mode missing auth fields
-    When I run main.py with args "--mode manual --data-dir /tmp/test-data --service-id test --ingress-server-url https://test.com"
+    When I run main.py with args "--mode manual --data-dir /tmp --service-id test --ingress-server-url https://test.com"
     And I use the print-config-and-exit flag
     Then the exit code must be 1
     And the log must contain: "Missing required configuration"
@@ -38,10 +38,10 @@ Feature: Service configuration and validation
     Then the exit code must be 0
     And the log must contain: "Printing resolved configuration"
     And the config output must contain: "service_id" with value "test-service"
-    And the config output must contain: "data_dir" with value "/tmp/test-data"
+    And the config output must contain: "data_dir" with value "/tmp"
 
   Scenario: OpenShift mode with manual auth fields
-    When I run main.py with args "--mode openshift --data-dir /tmp/test-data --service-id test --ingress-server-url https://test.com --ingress-server-auth-token manual-token --identity-id manual-id"
+    When I run main.py with args "--mode openshift --data-dir /tmp --service-id test --ingress-server-url https://test.com --ingress-server-auth-token manual-token --identity-id manual-id"
     And I use the print-config-and-exit flag
     Then the exit code must be 1
     And the log must contain: "Authentication failed"
@@ -53,7 +53,7 @@ Feature: Service configuration and validation
     Then the exit code must be 0
     And the log must contain: "Printing resolved configuration"
     And the config output must contain: "service_id" with value "from-cli"
-    And the config output must contain: "data_dir" with value "/tmp/test-data"
+    And the config output must contain: "data_dir" with value "/tmp"
 
   Scenario: Environment variable precedence for auth token
     Given I set environment variable "INGRESS_SERVER_AUTH_TOKEN" to "from-env"

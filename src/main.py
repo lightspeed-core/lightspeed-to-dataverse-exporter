@@ -5,6 +5,7 @@ import argparse
 import logging
 import signal
 import sys
+import yaml
 import json
 from os import environ
 from pathlib import Path
@@ -142,7 +143,7 @@ def parse_args() -> Args:
         help="SSO Client secret value (only when using 'sso' auth). Also accepted in the CLIENT_SECRET envvar.",
     )
 
-    
+    parser.add_argument(
         "--print-config-and-exit",
         action="store_true",
         help="Print the resolved configuration as JSON and exit without running the service",
@@ -253,8 +254,6 @@ def main() -> int:
 
         if args.config:
             logger.info("Loading configuration from %s", args.config)
-            import yaml
-
             with open(args.config, "r", encoding="utf-8") as f:
                 config_dict = yaml.safe_load(f)
 

@@ -1,5 +1,5 @@
 service_id: "test-service"
-data_dir: "/tmp/test-data"
+data_dir: "/tmp"
 ingress_server_url: "https://test.example.com"
 ingress_server_auth_token: "test-token"
 identity_id: "test-identity"

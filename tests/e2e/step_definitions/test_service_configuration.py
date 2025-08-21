@@ -4,6 +4,7 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -101,8 +102,6 @@ def temp_config_file():
 
     # Cleanup: remove temporary file if it was created
     if "path" in temp_file_data:
-        import os
-
         try:
             os.unlink(temp_file_data["path"])
         except FileNotFoundError:
@@ -126,8 +125,6 @@ def set_ingress_auth_token_env(env_vars):
 @given("I have a config file with content:")
 def create_temp_config_file(temp_config_file, docstring):
     """Create a temporary config file with the given content."""
-    import tempfile
-
     # Create a temporary file
     temp_file = tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False)
     temp_file.write(docstring)
@@ -253,7 +250,7 @@ def run_main_with_args(main_py_path, command_args, args):
 
 # Specific step definitions for args patterns with nested quotes
 @when(
-    'I run main.py with args "--mode manual --data-dir /tmp/test-data --service-id test --ingress-server-url https://test.com"'
+    'I run main.py with args "--mode manual --data-dir /tmp --service-id test --ingress-server-url https://test.com"'
 )
 def run_main_with_manual_mode_args(main_py_path, command_args):
     """Build command for manual mode missing auth fields."""
@@ -261,7 +258,7 @@ def run_main_with_manual_mode_args(main_py_path, command_args):
         "--mode",
         "manual",
         "--data-dir",
-        "/tmp/test-data",
+        "/tmp",
         "--service-id",
         "test",
         "--ingress-server-url",
@@ -273,7 +270,7 @@ def run_main_with_manual_mode_args(main_py_path, command_args):
 
 
 @when(
-    'I run main.py with args "--mode openshift --data-dir /tmp/test-data --service-id test --ingress-server-url https://test.com --ingress-server-auth-token manual-token --identity-id manual-id"'
+    'I run main.py with args "--mode openshift --data-dir /tmp --service-id test --ingress-server-url https://test.com --ingress-server-auth-token manual-token --identity-id manual-id"'
 )
 def run_main_with_openshift_mode_args(main_py_path, command_args):
     """Build command for openshift mode with manual auth fields."""
@@ -281,7 +278,7 @@ def run_main_with_openshift_mode_args(main_py_path, command_args):
         "--mode",
         "openshift",
         "--data-dir",
-        "/tmp/test-data",
+        "/tmp",
         "--service-id",
         "test",
         "--ingress-server-url",
@@ -442,9 +439,9 @@ def check_config_output_service_id_test_service(command_result):
     assert_config_value(command_result, "service_id", "test-service")
 
 
-@then('the config output must contain: "data_dir" with value "/tmp/test-data"')
+@then('the config output must contain: "data_dir" with value "/tmp"')
 def check_config_output_data_dir(command_result):
-    assert_config_value(command_result, "data_dir", "/tmp/test-data")
+    assert_config_value(command_result, "data_dir", "/tmp")
 
 
 @then(
