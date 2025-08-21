@@ -76,7 +76,6 @@ class TestDeleteFiles:
             patch("pathlib.Path.unlink") as mock_unlink,
             patch("pathlib.Path.exists", return_value=True) as mock_exists,
         ):
-
             delete_files([test_file])
 
             mock_unlink.assert_called_once()

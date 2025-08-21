@@ -35,6 +35,7 @@ def create_test_config(**overrides) -> DataCollectorSettings:
         "ingress_connection_timeout": 30,
         "cleanup_after_send": True,
         "allowed_subdirs": [],
+        "retry_interval": 10,
     }
     defaults.update(overrides)
     return DataCollectorSettings(**defaults)

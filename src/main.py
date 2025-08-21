@@ -7,46 +7,41 @@ import signal
 import sys
 from os import environ
 from pathlib import Path
+from typing import TypeVar, cast, get_args
+
+from pydantic import ValidationError
+
+from src import constants
+from src.auth import AuthMode
+from src.auth.providers import OpenShiftAuthProvider, SSOServiceAccountAuthProvider
 from src.settings import DataCollectorSettings
 from src.data_exporter import DataCollectorService
-from src.auth import get_auth_credentials, AuthenticationError
-from src import constants
+from src.auth.providers import AuthenticationError
+
+
+class Args(argparse.Namespace):
+    mode: AuthMode
+    config: Path | None
+    data_dir: Path | None
+    service_id: str | None
+    ingress_server_url: str | None
+    ingress_server_auth_token: str | None
+    identity_id: str | None
+    collection_interval: int | None
+    ingress_connection_timeout: int | None
+    retry_interval: int | None
+    no_cleanup: bool
+    allowed_subdirs: list[str] | None
+    log_level: str
+    rich_logs: bool
+    client_id: str | None
+    client_secret: str | None
+
 
 logger = logging.getLogger(__name__)
 
 
-def validate_required_config(config_dict: dict, mode: str) -> None:
-    """Validate that all required configuration is present.
-
-    Args:
-        config_dict: Dictionary containing configuration values
-        mode: Authentication mode (openshift or manual)
-
-    Raises:
-        SystemExit: If required configuration is missing
-    """
-    required_fields = ["data_dir", "service_id", "ingress_server_url"]
-    if mode == "manual":
-        required_fields.extend(["ingress_server_auth_token", "identity_id"])
-
-    missing_fields = [
-        field
-        for field in required_fields
-        if field not in config_dict or config_dict[field] is None
-    ]
-
-    if missing_fields:
-        logger.error(
-            "Missing required configuration: %s",
-            ", ".join(f"--{field.replace('_', '-')}" for field in missing_fields),
-        )
-        logger.error(
-            "Either provide --config with a YAML file or all required arguments"
-        )
-        sys.exit(1)
-
-
-def parse_args() -> argparse.Namespace:
+def parse_args() -> Args:
     """Parse command line arguments with environment selection."""
     parser = argparse.ArgumentParser(
         description="Lightspeed to Dataverse data exporter",
@@ -55,9 +50,9 @@ def parse_args() -> argparse.Namespace:
 
     parser.add_argument(
         "--mode",
-        choices=["openshift", "manual"],
+        choices=get_args(AuthMode),
         default="manual",
-        help="Authentication mode: 'openshift' (OpenShift cluster auth), 'manual' (explicit credentials)",
+        help="Authentication mode: 'openshift' (OpenShift cluster auth), 'sso' (RedHat SSO auth), 'manual' (explicit credentials)",
     )
 
     parser.add_argument(
@@ -136,7 +131,17 @@ def parse_args() -> argparse.Namespace:
         help="Enable rich colored logging output",
     )
 
-    return parser.parse_args()
+    parser.add_argument(
+        "--client-id",
+        help="SSO Client ID (only when using 'sso' auth). Also accepted in the CLIENT_ID envvar.",
+    )
+
+    parser.add_argument(
+        "--client-secret",
+        help="SSO Client secret value (only when using 'sso' auth). Also accepted in the CLIENT_SECRET envvar.",
+    )
+
+    return cast(Args, parser.parse_args())
 
 
 def configure_logging(log_level: str, use_rich: bool = False) -> None:
@@ -189,6 +194,16 @@ def configure_logging(log_level: str, use_rich: bool = False) -> None:
     logging.getLogger("urllib3").setLevel(logging.WARNING)
 
 
+T = TypeVar("T")
+
+
+def first_not_none(*values: list[T | None]) -> T | None:
+    for v in values:
+        if v is not None:
+            return v
+    return None
+
+
 def main() -> int:
     """Main function."""
     args = parse_args()
@@ -198,82 +213,114 @@ def main() -> int:
     logger.info("Starting Lightspeed to Dataverse exporter (mode: %s)", args.mode)
 
     try:
-        # Load config as dict if provided
         config_dict = {}
+
+        auth_token: str | None = None
+        identity_id: str | None = None
+
+        if args.mode != "manual":
+            if args.mode == "openshift":
+                provider = OpenShiftAuthProvider()
+            elif args.mode == "sso":
+                client_id = args.client_id or environ.get("CLIENT_ID")
+                client_secret = args.client_secret or environ.get("CLIENT_SECRET")
+
+                if not client_id or not client_secret:
+                    logging.error(
+                        "Must specify client id and secret when using sso auth"
+                    )
+                    sys.exit(1)
+
+                provider = SSOServiceAccountAuthProvider(
+                    client_id=client_id,
+                    client_secret=client_secret,
+                    identity_id=args.identity_id,
+                    # Just expose this via envvar since it is not really for prod use
+                    env="stage" if environ.get("USE_SSO_STAGE") is not None else "prod",
+                )
+            else:
+                logger.error(f"Invalid auth mode: {args.mode}")
+                sys.exit(1)
+
+            auth_token, identity_id = provider.get_credentials()
+
         if args.config:
             logger.info("Loading configuration from %s", args.config)
             import yaml
 
             with open(args.config, "r", encoding="utf-8") as f:
-                config_dict = yaml.safe_load(f) or {}
+                config_dict = yaml.safe_load(f)
 
-        # Apply CLI args to config dict (CLI args override config file values)
-        if args.data_dir:
-            config_dict["data_dir"] = args.data_dir
-        if args.service_id:
-            config_dict["service_id"] = args.service_id
-        if args.ingress_server_url:
-            config_dict["ingress_server_url"] = args.ingress_server_url
-        if args.ingress_server_auth_token:
-            config_dict["ingress_server_auth_token"] = args.ingress_server_auth_token
-        elif "INGRESS_SERVER_AUTH_TOKEN" in environ:
-            config_dict["ingress_server_auth_token"] = environ[
-                "INGRESS_SERVER_AUTH_TOKEN"
-            ]
-        if args.identity_id:
-            config_dict["identity_id"] = args.identity_id
-        if args.collection_interval:
-            config_dict["collection_interval"] = args.collection_interval
-        if args.ingress_connection_timeout:
-            config_dict["ingress_connection_timeout"] = args.ingress_connection_timeout
-        if args.retry_interval:
-            config_dict["retry_interval"] = args.retry_interval
-        if args.no_cleanup:
-            config_dict["cleanup_after_send"] = False
-        if args.allowed_subdirs:
-            config_dict["allowed_subdirs"] = args.allowed_subdirs
-
-        # Validate required configuration
-        validate_required_config(config_dict, args.mode)
-
-        # Get authentication credentials based on mode
-        auth_token, identity_id = get_auth_credentials(
-            mode=args.mode,
-            auth_token=args.ingress_server_auth_token
-            or config_dict.get("ingress_server_auth_token"),
-            identity_id=args.identity_id or config_dict.get("identity_id"),
+        config = DataCollectorSettings(
+            data_dir=first_not_none(args.data_dir, config_dict.get("data_dir")),
+            service_id=first_not_none(args.service_id, config_dict.get("service_id")),
+            ingress_server_url=first_not_none(
+                args.ingress_server_url, config_dict.get("ingress_server_url")
+            ),
+            # values from auth provider will take precedent
+            ingress_server_auth_token=first_not_none(
+                auth_token,
+                args.ingress_server_auth_token,
+                environ.get("INGRESS_SERVER_AUTH_TOKEN"),
+                config_dict.get("ingress_server_auth_token"),
+            ),
+            identity_id=first_not_none(
+                identity_id,
+                args.identity_id,
+                config_dict.get("identity_id"),
+                "lightspeed-exporter",
+            ),
+            collection_interval=first_not_none(
+                args.collection_interval,
+                config_dict.get("collection_interval"),
+                constants.DATA_COLLECTOR_COLLECTION_INTERVAL,
+            ),
+            ingress_connection_timeout=first_not_none(
+                args.ingress_connection_timeout,
+                config_dict.get("ingress_connection_timeout"),
+                constants.DATA_COLLECTOR_CONNECTION_TIMEOUT,
+            ),
+            retry_interval=first_not_none(
+                args.retry_interval,
+                config_dict.get("retry_interval"),
+                constants.DATA_COLLECTOR_RETRY_INTERVAL,
+            ),
+            cleanup_after_send=first_not_none(
+                False if args.no_cleanup is True else None,
+                config_dict.get("cleanup_after_send"),
+                True,
+            ),
+            allowed_subdirs=first_not_none(
+                args.allowed_subdirs, config_dict.get("allowed_subdirs"), []
+            ),
         )
 
-        # Update config dict with resolved auth values
-        config_dict["ingress_server_auth_token"] = auth_token
-        config_dict["identity_id"] = identity_id
-
-        # Set defaults for optional fields
-        config_dict.setdefault(
-            "collection_interval", constants.DATA_COLLECTOR_COLLECTION_INTERVAL
-        )
-        config_dict.setdefault(
-            "ingress_connection_timeout", constants.DATA_COLLECTOR_CONNECTION_TIMEOUT
-        )
-        config_dict.setdefault(
-            "retry_interval", constants.DATA_COLLECTOR_RETRY_INTERVAL
-        )
-        config_dict.setdefault("cleanup_after_send", True)
-        config_dict.setdefault("allowed_subdirs", [])
-
-        # Create settings from merged config
-        config = DataCollectorSettings(**config_dict)
         service = DataCollectorService(config)
 
         _ = signal.signal(signal.SIGTERM, lambda _, _2: service.shutdown())
 
         service.run()
 
+    except ValidationError as e:
+        logger.error(
+            "Invalid config\n"
+            + "\n".join(
+                [
+                    f"{''.join([str(loc) for loc in err['loc']])}: {err['msg']} (got {err['input']})"
+                    for err in e.errors()
+                ]
+            )
+        )
+        return 1
     except AuthenticationError as e:
         logger.error("Authentication failed: %s", e)
         if args.mode == "openshift":
             logger.info(
                 "Ensure the application is running in an OpenShift cluster with proper permissions"
+            )
+        elif args.mode == "sso":
+            logger.info(
+                "Ensure CLIENT_ID and CLIENT_SECRET envvars are set to valid SSO service account credentials"
             )
         elif args.mode == "manual":
             logger.info("Provide valid --ingress-server-auth-token and --identity-id")

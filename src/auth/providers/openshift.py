@@ -1,21 +1,16 @@
-"""Authentication providers for different deployment environments."""
+"""Providers for openshift auth."""
 
 import base64
 import json
 import logging
-import requests
 import kubernetes
 import kubernetes.client
 import kubernetes.config
 
-from src import constants
+from src.auth.providers.types import AuthProvider, AuthenticationError
 
 
 logger = logging.getLogger(__name__)
-
-
-class AuthenticationError(Exception):
-    """Exception raised when authentication fails."""
 
 
 class ClusterPullSecretNotFoundError(AuthenticationError):
@@ -24,78 +19,6 @@ class ClusterPullSecretNotFoundError(AuthenticationError):
 
 class ClusterIDNotFoundError(AuthenticationError):
     """Exception raised when cluster ID cannot be retrieved."""
-
-
-class AuthProvider:
-    """Base class for authentication providers."""
-
-    def get_auth_token(self) -> str:
-        """Get authentication token.
-
-        Returns:
-            str: Authentication token
-
-        Raises:
-            AuthenticationError: If token cannot be retrieved
-        """
-        raise NotImplementedError
-
-    def get_identity_id(self) -> str:
-        """Get identity identifier.
-
-        Returns:
-            str: Identity identifier
-
-        Raises:
-            AuthenticationError: If identity ID cannot be retrieved
-        """
-        raise NotImplementedError
-
-    def get_credentials(self) -> tuple[str, str]:
-        """Get both authentication token and identity ID.
-
-        Returns:
-            tuple[str, str]: Tuple of (auth_token, identity_id)
-
-        Raises:
-            AuthenticationError: If credentials cannot be retrieved
-        """
-        return self.get_auth_token(), self.get_identity_id()
-
-
-def access_token_from_offline_token(offline_token: str) -> str:
-    """Generate "access token" from the "offline token".
-
-    Offline token can be generated at:
-        prod - https://access.redhat.com/management/api
-        stage - https://access.stage.redhat.com/management/api
-
-    Args:
-        offline_token: Offline token from the Customer Portal.
-
-    Returns:
-        Refresh token.
-    """
-    url = "https://sso.stage.redhat.com/"
-    endpoint = "auth/realms/redhat-external/protocol/openid-connect/token"
-    data = {
-        "grant_type": "refresh_token",
-        "client_id": "rhsm-api",
-        "refresh_token": offline_token,
-    }
-
-    response = requests.post(
-        url + endpoint, data=data, timeout=constants.ACCESS_TOKEN_GENERATION_TIMEOUT
-    )
-    try:
-        if response.status_code == requests.codes.ok:
-            return response.json()["access_token"]
-        raise Exception(f"Failed to generate access token. Response: {response.json()}")
-    except json.JSONDecodeError:
-        raise Exception(
-            "Failed to generate access token. Response is not JSON."
-            f"Response: {response.status_code}: {response.text}"
-        )
 
 
 class OpenShiftAuthProvider(AuthProvider):
@@ -168,39 +91,3 @@ class OpenShiftAuthProvider(AuthProvider):
         except kubernetes.client.exceptions.ApiException as e:
             logger.error("Failed to get cluster version object, body: %s", str(e.body))
             raise ClusterIDNotFoundError("Cannot access cluster version") from e
-
-
-class ManualAuthProvider(AuthProvider):
-    """Authentication provider for manual environments with explicit credentials."""
-
-    def __init__(self, auth_token: str, identity_id: str):
-        """Initialize the manual authentication provider.
-
-        Args:
-            auth_token: Authentication token
-            identity_id: Identity identifier
-        """
-        if not auth_token or not identity_id:
-            raise AuthenticationError(
-                "Manual authentication requires both auth_token and identity_id"
-            )
-
-        self.auth_token = auth_token
-        self.identity_id = identity_id
-        logger.info("Initialized manual authentication provider")
-
-    def get_auth_token(self) -> str:
-        """Get the manually provided authentication token.
-
-        Returns:
-            str: The authentication token
-        """
-        return self.auth_token
-
-    def get_identity_id(self) -> str:
-        """Get the manually provided identity ID.
-
-        Returns:
-            str: The identity identifier
-        """
-        return self.identity_id

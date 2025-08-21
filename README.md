@@ -82,6 +82,16 @@ uv run python -m src.main --mode openshift --config config.yaml
 - Gets identity ID (cluster ID) from cluster version
 - No manual token management required
 
+**SSO Mode** (useful when cluster pull-secrets are not available or appropriate):
+```bash
+uv run python -m src.main --mode sso --config config.yaml --client-id my-client-id --client-secret my-client-secret
+```
+- Automatically retrieves auth token from cluster api endpoints using SSO credentials
+- Gets identity ID from SSO token `preferred_username` or `sub` field (can also be manually provided)
+- Client ID/Secret can also be provided as envvars `CLIENT_ID` and `CLIENT_SECRET`
+- You can use sso.stage.redhat.com by setting the USE_SSO_STAGE envvar to any value.
+
+
 **Manual Mode** (for local testing or non-OpenShift environments):
 ```bash
 uv run python -m src.main --mode manual --config config.yaml \
