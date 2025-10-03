@@ -20,6 +20,9 @@ WORKDIR /app-root
 COPY src ./src
 COPY pyproject.toml LICENSE README.md requirements.txt ./
 
+# this directory is checked by ecosystem-cert-preflight-checks task in Konflux
+COPY LICENSE /licenses/
+
 # Install dependencies
 RUN pip3.12 install --no-cache-dir -r requirements.txt
 
