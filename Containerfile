@@ -15,9 +15,6 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app-root
 
-# Install/update pip
-RUN pip3.12 install --upgrade pip
-
 # Add explicit files and directories
 # (avoid accidental inclusion of local directories or env files or credentials)
 COPY src ./src
