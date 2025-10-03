@@ -25,7 +25,7 @@ certifi==2025.7.14 \
     # via
     #   kubernetes
     #   requests
-charset-normalizer==3.4.2 \
+charset-normalizer==3.4.3 \
     --hash=sha256:0c29de6a1a95f24b9a1aa7aefd27d2487263f00dfd55a77719b530788f75cff7 \
     --hash=sha256:1c95a1e2902a8b722868587c0e1184ad5c55631de5afc0eb96bc4b0d738092c0 \
     --hash=sha256:289200a18fa698949d2b39c671c2cc7a24d44096784e76614899a7ccf2574b7b \
