@@ -153,6 +153,22 @@ make test    # Run tests
 make test-cov # Run tests with coverage
 ```
 
+## Adding dependencies
+
+When adding, removing, or modifying dependencies in this project, you must update the `requirements.txt` file to ensure compatibility with the Konflux build system.
+
+### Steps to update dependencies:
+
+1. Add or modify dependencies in your `pyproject.toml` file
+2. Install the updated dependencies:
+   ```bash
+   uv sync
+   ```
+3. Export the updated lockfile to `requirements.txt`:
+   ```bash
+   uv export --format requirements.txt --no-emit-project > requirements.txt
+   ```
+
 ## Questions?
 
 If you have questions about the build process or contributing guidelines, please open an issue or reach out to the maintainers.

@@ -26,6 +26,10 @@ spec:
     value: quay.io/redhat-user-workloads/crt-nshift-lightspeed-tenant/lightspeed-to-dataverse-exporter:{{revision}}
   - name: dockerfile
     value: Containerfile
+  - name: prefetch-input
+    value: '[{"type": "pip", "path": ".", "allow_binary": "true"}]'
+  - name: build-source-image
+    value: 'true'
   pipelineSpec:
     description: |
       This pipeline is ideal for building container images from a Containerfile while maintaining trust after pipeline customization.
@@ -61,7 +65,7 @@ spec:
       description: Skip checks against built image
       name: skip-checks
       type: string
-    - default: "false"
+    - default: "true"
       description: Execute the build with network isolation
       name: hermetic
       type: string
@@ -170,6 +174,8 @@ spec:
         value: $(params.output-image).prefetch
       - name: ociArtifactExpiresAfter
         value: $(params.image-expires-after)
+      - name: dev-package-managers
+        value: 'true'
       runAfter:
       - clone-repository
       taskRef:
