@@ -65,7 +65,7 @@ colorama==0.4.6 ; sys_platform == 'win32' \
     # via
     #   click
     #   pytest
-coverage==7.10.0 \
+coverage==7.10.7 \
     --hash=sha256:048d19a5d641a2296745ab59f34a27b89a08c48d6d432685f22aac0ec1ea447f \
     --hash=sha256:04ec59ceb3a594af0927f2e0d810e1221212abd9a2e6b5b917769ff48760b460 \
     --hash=sha256:0a889ef25215990f65073c32cadf37483363a6a22914186dedc15a6b1a597d50 \
