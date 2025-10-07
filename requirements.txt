@@ -306,7 +306,7 @@ pytest-bdd==8.1.0 \
 pytest-cov==6.2.1 \
     --hash=sha256:25cc6cc0a5358204b8108ecedc51a9b57b34cc6b8c967cc2c01a4e00d8a67da2 \
     --hash=sha256:f5bc4c23f42f1cdd23c70b1dab1bbaef4fc505ba950d53e0081d0730dd7e86d5
-pytest-mock==3.14.1 \
+pytest-mock==3.15.1 \
     --hash=sha256:159e9edac4c451ce77a5cdb9fc5d1100708d2dd4ba3c3df572f14097351af80e \
     --hash=sha256:178aefcd11307d874b4cd3100344e7e2d888d9791a6a1d9bfe90fbc1b74fd1d0
 pytest-timeout==2.4.0 \
