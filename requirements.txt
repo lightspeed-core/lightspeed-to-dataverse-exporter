@@ -303,7 +303,7 @@ pytest==8.4.1 \
 pytest-bdd==8.1.0 \
     --hash=sha256:2124051e71a05ad7db15296e39013593f72ebf96796e1b023a40e5453c47e5fb \
     --hash=sha256:ef0896c5cd58816dc49810e8ff1d632f4a12019fb3e49959b2d349ffc1c9bfb5
-pytest-cov==6.2.1 \
+pytest-cov==6.3.0 \
     --hash=sha256:25cc6cc0a5358204b8108ecedc51a9b57b34cc6b8c967cc2c01a4e00d8a67da2 \
     --hash=sha256:f5bc4c23f42f1cdd23c70b1dab1bbaef4fc505ba950d53e0081d0730dd7e86d5
 pytest-mock==3.14.1 \
