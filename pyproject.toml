@@ -40,4 +40,8 @@ dev-dependencies = [
     "black>=22.0.0",
     "ruff>=0.1.0",
     "requests-mock>=1.12.1",
-] 
+]
+
+[tool.ruff]
+[tool.ruff.lint.flake8-tidy-imports]
+banned-api = { "unittest" = { msg = "use pytest instead of unittest" }, "unittest.mock" = { msg = "use pytest-mock instead of unittest.mock" } }
