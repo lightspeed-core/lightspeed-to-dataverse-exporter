@@ -1,7 +1,7 @@
 """Tests for src.auth module."""
 
 import base64
-from unittest.mock import Mock, patch
+from pytest_mock import MockerFixture
 
 import jwt
 import kubernetes
@@ -29,13 +29,13 @@ class TestAuthProvider:
         with pytest.raises(NotImplementedError):
             provider.get_identity_id()
 
-    def test_get_credentials_returns_tuple(self):
+    def test_get_credentials_returns_tuple(self, mocker: MockerFixture):
         """Test that get_credentials returns a tuple of token and identity."""
         provider = AuthProvider()
 
         # Mock the individual methods
-        provider.get_auth_token = Mock(return_value="test-token")
-        provider.get_identity_id = Mock(return_value="test-identity")
+        provider.get_auth_token = mocker.Mock(return_value="test-token")
+        provider.get_identity_id = mocker.Mock(return_value="test-identity")
 
         token, identity = provider.get_credentials()
 
@@ -48,11 +48,15 @@ class TestAuthProvider:
 class TestOpenShiftAuthProvider:
     """Test cases for OpenShiftAuthProvider."""
 
-    @patch("src.auth.providers.openshift.kubernetes.config.load_incluster_config")
-    @patch("src.auth.providers.openshift.kubernetes.client.CoreV1Api")
-    def test_successful_initialization(self, mock_core_v1, mock_load_config):
+    def test_successful_initialization(self, mocker: MockerFixture):
         """Test successful initialization in OpenShift cluster."""
-        mock_client = Mock()
+        mock_load_config = mocker.patch(
+            "src.auth.providers.openshift.kubernetes.config.load_incluster_config"
+        )
+        mock_core_v1 = mocker.patch(
+            "src.auth.providers.openshift.kubernetes.client.CoreV1Api"
+        )
+        mock_client = mocker.Mock()
         mock_core_v1.return_value = mock_client
 
         provider = OpenShiftAuthProvider()
@@ -61,9 +65,11 @@ class TestOpenShiftAuthProvider:
         mock_core_v1.assert_called_once()
         assert provider._k8s_client == mock_client
 
-    @patch("src.auth.providers.openshift.kubernetes.config.load_incluster_config")
-    def test_initialization_fails_outside_cluster(self, mock_load_config):
+    def test_initialization_fails_outside_cluster(self, mocker: MockerFixture):
         """Test initialization fails when not in OpenShift cluster."""
+        mock_load_config = mocker.patch(
+            "src.auth.providers.openshift.kubernetes.config.load_incluster_config"
+        )
         mock_load_config.side_effect = kubernetes.config.ConfigException(
             "Not in cluster"
         )
@@ -73,16 +79,20 @@ class TestOpenShiftAuthProvider:
 
         assert "Not running in OpenShift cluster" in str(exc_info.value)
 
-    @patch("src.auth.providers.openshift.kubernetes.config.load_incluster_config")
-    @patch("src.auth.providers.openshift.kubernetes.client.CoreV1Api")
-    @patch("src.auth.providers.openshift.kubernetes.client.CustomObjectsApi")
-    def test_get_identity_id_success(
-        self, mock_custom_api, mock_core_v1, mock_load_config
-    ):
+    def test_get_identity_id_success(self, mocker: MockerFixture):
         """Test successful cluster ID retrieval."""
         # Setup mocks
-        mock_core_v1.return_value = Mock()
-        mock_custom_client = Mock()
+        mocker.patch(
+            "src.auth.providers.openshift.kubernetes.config.load_incluster_config"
+        )
+        mock_core_v1 = mocker.patch(
+            "src.auth.providers.openshift.kubernetes.client.CoreV1Api"
+        )
+        mock_custom_api = mocker.patch(
+            "src.auth.providers.openshift.kubernetes.client.CustomObjectsApi"
+        )
+        mock_core_v1.return_value = mocker.Mock()
+        mock_custom_client = mocker.Mock()
         mock_custom_api.return_value = mock_custom_client
 
         # Mock cluster version response
@@ -100,15 +110,19 @@ class TestOpenShiftAuthProvider:
             name="version",
         )
 
-    @patch("src.auth.providers.openshift.kubernetes.config.load_incluster_config")
-    @patch("src.auth.providers.openshift.kubernetes.client.CoreV1Api")
-    def test_get_auth_token_key_error(self, mock_core_v1, mock_load_config):
+    def test_get_auth_token_key_error(self, mocker: MockerFixture):
         """Test get_auth_token handles KeyError when pull secret is malformed."""
-        mock_client = Mock()
+        mocker.patch(
+            "src.auth.providers.openshift.kubernetes.config.load_incluster_config"
+        )
+        mock_core_v1 = mocker.patch(
+            "src.auth.providers.openshift.kubernetes.client.CoreV1Api"
+        )
+        mock_client = mocker.Mock()
         mock_core_v1.return_value = mock_client
 
         # Mock secret with missing keys
-        mock_secret = Mock()
+        mock_secret = mocker.Mock()
         mock_secret.data = {}  # Missing .dockerconfigjson key
         mock_client.read_namespaced_secret.return_value = mock_secret
 
@@ -119,15 +133,19 @@ class TestOpenShiftAuthProvider:
 
         assert "Missing required keys in pull secret" in str(exc_info.value)
 
-    @patch("src.auth.providers.openshift.kubernetes.config.load_incluster_config")
-    @patch("src.auth.providers.openshift.kubernetes.client.CoreV1Api")
-    def test_get_auth_token_json_decode_error(self, mock_core_v1, mock_load_config):
+    def test_get_auth_token_json_decode_error(self, mocker: MockerFixture):
         """Test get_auth_token handles JSONDecodeError when pull secret data is invalid."""
-        mock_client = Mock()
+        mocker.patch(
+            "src.auth.providers.openshift.kubernetes.config.load_incluster_config"
+        )
+        mock_core_v1 = mocker.patch(
+            "src.auth.providers.openshift.kubernetes.client.CoreV1Api"
+        )
+        mock_client = mocker.Mock()
         mock_core_v1.return_value = mock_client
 
         # Mock secret with invalid JSON
-        mock_secret = Mock()
+        mock_secret = mocker.Mock()
         invalid_json = base64.b64encode(b"invalid json").decode("utf-8")
         mock_secret.data = {".dockerconfigjson": invalid_json}
         mock_client.read_namespaced_secret.return_value = mock_secret
@@ -139,11 +157,15 @@ class TestOpenShiftAuthProvider:
 
         assert "Invalid pull secret format" in str(exc_info.value)
 
-    @patch("src.auth.providers.openshift.kubernetes.config.load_incluster_config")
-    @patch("src.auth.providers.openshift.kubernetes.client.CoreV1Api")
-    def test_get_auth_token_api_exception(self, mock_core_v1, mock_load_config):
+    def test_get_auth_token_api_exception(self, mocker: MockerFixture):
         """Test get_auth_token handles Kubernetes API exceptions."""
-        mock_client = Mock()
+        mocker.patch(
+            "src.auth.providers.openshift.kubernetes.config.load_incluster_config"
+        )
+        mock_core_v1 = mocker.patch(
+            "src.auth.providers.openshift.kubernetes.client.CoreV1Api"
+        )
+        mock_client = mocker.Mock()
         mock_core_v1.return_value = mock_client
 
         # Mock API exception
@@ -160,16 +182,20 @@ class TestOpenShiftAuthProvider:
 
         assert "Cannot access pull secret" in str(exc_info.value)
 
-    @patch("src.auth.providers.openshift.kubernetes.config.load_incluster_config")
-    @patch("src.auth.providers.openshift.kubernetes.client.CoreV1Api")
-    @patch("src.auth.providers.openshift.kubernetes.client.CustomObjectsApi")
-    def test_get_identity_id_key_error(
-        self, mock_custom_api, mock_core_v1, mock_load_config
-    ):
+    def test_get_identity_id_key_error(self, mocker: MockerFixture):
         """Test get_identity_id handles KeyError when cluster version is malformed."""
-        mock_client = Mock()
+        mocker.patch(
+            "src.auth.providers.openshift.kubernetes.config.load_incluster_config"
+        )
+        mock_core_v1 = mocker.patch(
+            "src.auth.providers.openshift.kubernetes.client.CoreV1Api"
+        )
+        mock_custom_api = mocker.patch(
+            "src.auth.providers.openshift.kubernetes.client.CustomObjectsApi"
+        )
+        mock_client = mocker.Mock()
         mock_core_v1.return_value = mock_client
-        mock_custom_client = Mock()
+        mock_custom_client = mocker.Mock()
         mock_custom_api.return_value = mock_custom_client
 
         # Mock cluster version response missing clusterID
@@ -183,16 +209,20 @@ class TestOpenShiftAuthProvider:
 
         assert "Missing cluster ID in cluster version" in str(exc_info.value)
 
-    @patch("src.auth.providers.openshift.kubernetes.config.load_incluster_config")
-    @patch("src.auth.providers.openshift.kubernetes.client.CoreV1Api")
-    @patch("src.auth.providers.openshift.kubernetes.client.CustomObjectsApi")
-    def test_get_identity_id_api_exception(
-        self, mock_custom_api, mock_core_v1, mock_load_config
-    ):
+    def test_get_identity_id_api_exception(self, mocker: MockerFixture):
         """Test get_identity_id handles Kubernetes API exceptions."""
-        mock_client = Mock()
+        mocker.patch(
+            "src.auth.providers.openshift.kubernetes.config.load_incluster_config"
+        )
+        mock_core_v1 = mocker.patch(
+            "src.auth.providers.openshift.kubernetes.client.CoreV1Api"
+        )
+        mock_custom_api = mocker.patch(
+            "src.auth.providers.openshift.kubernetes.client.CustomObjectsApi"
+        )
+        mock_client = mocker.Mock()
         mock_core_v1.return_value = mock_client
-        mock_custom_client = Mock()
+        mock_custom_client = mocker.Mock()
         mock_custom_api.return_value = mock_custom_client
 
         # Mock API exception

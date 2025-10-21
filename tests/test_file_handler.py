@@ -4,7 +4,7 @@ import pytest
 import tempfile
 import shutil
 from pathlib import Path
-from unittest.mock import patch, call
+from pytest_mock import MockerFixture
 import logging
 
 from src.file_handler import FileHandler, delete_files, chunk_data, filter_symlinks
@@ -44,13 +44,15 @@ class TestDeleteFiles:
         assert "Removing" in caplog.text
         assert "already deleted or does not exist" in caplog.text
 
-    @patch("pathlib.Path.unlink")
-    def test_delete_files_permission_error(self, mock_unlink, tmp_path, caplog):
+    def test_delete_files_permission_error(
+        self, mocker: MockerFixture, tmp_path, caplog
+    ):
         """Test deletion with permission errors."""
         file1 = tmp_path / "test.json"
         file1.write_text('{"test": 1}')
 
         # Mock unlink to raise PermissionError
+        mock_unlink = mocker.patch("pathlib.Path.unlink")
         mock_unlink.side_effect = PermissionError("Permission denied")
 
         with caplog.at_level(logging.ERROR):
@@ -65,24 +67,22 @@ class TestDeleteFiles:
         # Should not raise any errors
         delete_files([])
 
-    @patch("src.file_handler.logger")
-    def test_delete_files_still_exists_after_unlink(self, mock_logger, tmp_path):
+    def test_delete_files_still_exists_after_unlink(
+        self, mocker: MockerFixture, tmp_path
+    ):
         """Test delete_files when file still exists after unlink (edge case)."""
+        mock_logger = mocker.patch("src.file_handler.logger")
         test_file = tmp_path / "test.json"
         test_file.write_text("{}")
 
         # Mock pathlib.Path.unlink to succeed but pathlib.Path.exists to return True
-        with (
-            patch("pathlib.Path.unlink") as mock_unlink,
-            patch("pathlib.Path.exists", return_value=True) as mock_exists,
-        ):
-            delete_files([test_file])
+        mock_unlink = mocker.patch("pathlib.Path.unlink")
+        mock_exists = mocker.patch("pathlib.Path.exists", return_value=True)
+        delete_files([test_file])
 
-            mock_unlink.assert_called_once()
-            mock_exists.assert_called_once()
-            mock_logger.error.assert_called_once_with(
-                "Failed to remove '%s'", test_file
-            )
+        mock_unlink.assert_called_once()
+        mock_exists.assert_called_once()
+        mock_logger.error.assert_called_once_with("Failed to remove '%s'", test_file)
 
 
 class TestFilterSymlinks:
@@ -434,11 +434,11 @@ class TestFileHandler:
         assert "Skipping symlink" in caplog.text
         assert str(symlink_file) in caplog.text
 
-    @patch("src.file_handler.logger")
     def test_collect_files_oversized_file_removal_fails(
-        self, mock_logger, temp_data_dir
+        self, mocker: MockerFixture, temp_data_dir
     ):
         """Test collect_files when removal of oversized file fails with OSError."""
+        mock_logger = mocker.patch("src.file_handler.logger")
         handler = FileHandler(temp_data_dir, max_payload_size=10)
 
         # Create an oversized file
@@ -451,8 +451,8 @@ class TestFileHandler:
             raise OSError("Permission denied")
 
         # Patch the unlink method on the specific file
-        with patch.object(type(oversized_file), "unlink", mock_unlink_with_error):
-            collected = handler.collect_files()
+        mocker.patch.object(type(oversized_file), "unlink", mock_unlink_with_error)
+        collected = handler.collect_files()
 
         # Should have no collected files
         assert len(collected) == 0
@@ -464,10 +464,10 @@ class TestFileHandler:
         assert oversized_file in args
         assert "Permission denied" in str(args[2])
 
-    @patch("src.file_handler.chunk_data")
-    def test_gather_data_chunks_with_data(self, mock_chunk_data, handler, caplog):
+    def test_gather_data_chunks_with_data(self, mocker: MockerFixture, handler, caplog):
         """Test gather_data_chunks with data."""
         # Mock chunk_data to return test chunks
+        mock_chunk_data = mocker.patch("src.file_handler.chunk_data")
         mock_chunks = [[Path("file1.json")], [Path("file2.json"), Path("file3.json")]]
         mock_chunk_data.return_value = mock_chunks
 
@@ -486,9 +486,9 @@ class TestFileHandler:
         )
         assert "Collected 3 files (split to 2 chunks)" in caplog.text
 
-    @patch("src.file_handler.chunk_data")
-    def test_gather_data_chunks_empty(self, mock_chunk_data, handler, caplog):
+    def test_gather_data_chunks_empty(self, mocker: MockerFixture, handler, caplog):
         """Test gather_data_chunks with no data."""
+        mock_chunk_data = mocker.patch("src.file_handler.chunk_data")
         mock_chunk_data.return_value = []
 
         with caplog.at_level(logging.INFO):
@@ -498,18 +498,20 @@ class TestFileHandler:
         # Should not log when no chunks
         assert "Collected" not in caplog.text
 
-    @patch("src.file_handler.delete_files")
-    def test_delete_collected_files(self, mock_delete_files, handler):
+    def test_delete_collected_files(self, mocker: MockerFixture, handler):
         """Test delete_collected_files wrapper method."""
+        mock_delete_files = mocker.patch("src.file_handler.delete_files")
         test_files = [Path("file1.json"), Path("file2.json")]
 
         handler.delete_collected_files(test_files)
 
         mock_delete_files.assert_called_once_with(test_files)
 
-    @patch("src.file_handler.delete_files")
-    def test_ensure_size_limit_under_limit(self, mock_delete_files, handler, caplog):
+    def test_ensure_size_limit_under_limit(
+        self, mocker: MockerFixture, handler, caplog
+    ):
         """Test ensure_size_limit when under the limit."""
+        mock_delete_files = mocker.patch("src.file_handler.delete_files")
         # Create handler with large limit
         handler.max_data_dir_size = 1000
 
@@ -522,9 +524,9 @@ class TestFileHandler:
         mock_delete_files.assert_not_called()
         assert "Data folder size is bigger" not in caplog.text
 
-    @patch("src.file_handler.delete_files")
-    def test_ensure_size_limit_over_limit(self, mock_delete_files, handler, caplog):
+    def test_ensure_size_limit_over_limit(self, mocker: MockerFixture, handler, caplog):
         """Test ensure_size_limit when over the limit."""
+        mock_delete_files = mocker.patch("src.file_handler.delete_files")
         # Create handler with small limit
         handler.max_data_dir_size = 100
 
@@ -544,11 +546,11 @@ class TestFileHandler:
         )
         assert "Removing files to fit the data into the limit" in caplog.text
 
-    @patch("src.file_handler.delete_files")
     def test_ensure_size_limit_multiple_deletions(
-        self, mock_delete_files, handler, caplog
+        self, mocker: MockerFixture, handler, caplog
     ):
         """Test ensure_size_limit when multiple files need deletion."""
+        mock_delete_files = mocker.patch("src.file_handler.delete_files")
         handler.max_data_dir_size = 50
 
         collected_files = [
@@ -561,7 +563,10 @@ class TestFileHandler:
             handler.ensure_size_limit(collected_files)
 
         # Should delete first two files (70 bytes removed, bringing total to 20 < 50)
-        expected_calls = [call([Path("file1.json")]), call([Path("file2.json")])]
+        expected_calls = [
+            mocker.call([Path("file1.json")]),
+            mocker.call([Path("file2.json")]),
+        ]
         mock_delete_files.assert_has_calls(expected_calls)
 
 

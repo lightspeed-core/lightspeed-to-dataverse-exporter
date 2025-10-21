@@ -2,7 +2,7 @@
 
 import io
 import pytest
-from unittest.mock import Mock, patch
+from pytest_mock import MockerFixture
 import requests
 
 from src.ingress_client import IngressClient
@@ -22,16 +22,16 @@ class TestIngressClient:
             connection_timeout=30,
         )
 
-    @patch("src.ingress_client.requests.Session")
-    def test_upload_data_to_ingress_success(self, mock_session_class, client):
+    def test_upload_data_to_ingress_success(self, mocker: MockerFixture, client):
         """Test successful data upload to ingress server."""
         # Setup mock response
-        mock_response = Mock()
+        mock_response = mocker.Mock()
         mock_response.status_code = 202
         mock_response.json.return_value = {"request_id": "test-123"}
 
-        mock_session = Mock()
+        mock_session = mocker.Mock()
         mock_session.post.return_value = mock_response
+        mock_session_class = mocker.patch("src.ingress_client.requests.Session")
         mock_session_class.return_value.__enter__.return_value = mock_session
 
         tarball = io.BytesIO(b"test data")
@@ -53,16 +53,16 @@ class TestIngressClient:
         for key, value in expected_headers.items():
             assert mock_session.headers[key] == value
 
-    @patch("src.ingress_client.requests.Session")
-    def test_upload_tarball_success(self, mock_session_class, client):
+    def test_upload_tarball_success(self, mocker: MockerFixture, client):
         """Test successful tarball upload."""
         # Setup mock response
-        mock_response = Mock()
+        mock_response = mocker.Mock()
         mock_response.status_code = 202
         mock_response.json.return_value = {"request_id": "test-request-123"}
 
-        mock_session = Mock()
+        mock_session = mocker.Mock()
         mock_session.post.return_value = mock_response
+        mock_session_class = mocker.patch("src.ingress_client.requests.Session")
         mock_session_class.return_value.__enter__.return_value = mock_session
 
         tarball = io.BytesIO(b"test tarball data")
@@ -74,16 +74,16 @@ class TestIngressClient:
         # Check that tarball is closed
         assert tarball.closed
 
-    @patch("src.ingress_client.requests.Session")
-    def test_upload_tarball_failure(self, mock_session_class, client):
+    def test_upload_tarball_failure(self, mocker: MockerFixture, client):
         """Test tarball upload failure handling."""
         # Setup mock response for failure
-        mock_response = Mock()
+        mock_response = mocker.Mock()
         mock_response.status_code = 500
         mock_response.text = "Internal Server Error"
 
-        mock_session = Mock()
+        mock_session = mocker.Mock()
         mock_session.post.return_value = mock_response
+        mock_session_class = mocker.patch("src.ingress_client.requests.Session")
         mock_session_class.return_value.__enter__.return_value = mock_session
 
         tarball = io.BytesIO(b"test tarball data")
@@ -95,11 +95,11 @@ class TestIngressClient:
         assert "Internal Server Error" in str(exc_info.value)
         mock_session.post.assert_called_once()
 
-    @patch("src.ingress_client.requests.Session")
-    def test_upload_tarball_network_error(self, mock_session_class, client):
+    def test_upload_tarball_network_error(self, mocker: MockerFixture, client):
         """Test tarball upload with network error."""
-        mock_session = Mock()
+        mock_session = mocker.Mock()
         mock_session.post.side_effect = requests.ConnectionError("Network error")
+        mock_session_class = mocker.patch("src.ingress_client.requests.Session")
         mock_session_class.return_value.__enter__.return_value = mock_session
 
         tarball = io.BytesIO(b"test tarball data")

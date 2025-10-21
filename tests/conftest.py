@@ -3,7 +3,7 @@
 import pytest
 import tempfile
 from pathlib import Path
-from unittest.mock import Mock
+from pytest_mock import MockerFixture
 
 
 @pytest.fixture
@@ -28,9 +28,9 @@ def sample_json_data():
 
 
 @pytest.fixture
-def mock_auth_provider():
+def mock_auth_provider(mocker: MockerFixture):
     """Mock authentication provider for testing."""
-    provider = Mock()
+    provider = mocker.Mock()
     provider.get_auth_token.return_value = "test-auth-token"
     provider.get_identity_id.return_value = "test-cluster-id"
     provider.get_credentials.return_value = ("test-auth-token", "test-cluster-id")
