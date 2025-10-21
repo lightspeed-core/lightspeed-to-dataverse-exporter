@@ -2,7 +2,7 @@
 
 import pytest
 from pathlib import Path
-from unittest.mock import Mock, patch, mock_open
+from pytest_mock import MockerFixture
 
 from src.main import parse_args, main, configure_logging
 from src.settings import DataCollectorSettings
@@ -12,7 +12,7 @@ from src.auth.providers import AuthenticationError
 class TestParseArgs:
     """Test cases for argument parsing."""
 
-    def test_parse_args_minimal_manual_mode(self):
+    def test_parse_args_minimal_manual_mode(self, mocker: MockerFixture):
         """Test parsing minimal arguments for manual mode."""
         test_args = [
             "--data-dir",
@@ -27,18 +27,18 @@ class TestParseArgs:
             "test-identity",
         ]
 
-        with patch("sys.argv", ["main.py"] + test_args):
-            args = parse_args()
+        mocker.patch("sys.argv", ["main.py"] + test_args)
+        args = parse_args()
 
-            assert args.mode == "manual"  # Default
-            assert args.data_dir == Path("/tmp")
-            assert args.service_id == "test-service"
-            assert args.ingress_server_url == "https://example.com"
-            assert args.ingress_server_auth_token == "test-token"
-            assert args.identity_id == "test-identity"
-            assert args.log_level == "INFO"  # Default
+        assert args.mode == "manual"  # Default
+        assert args.data_dir == Path("/tmp")
+        assert args.service_id == "test-service"
+        assert args.ingress_server_url == "https://example.com"
+        assert args.ingress_server_auth_token == "test-token"
+        assert args.identity_id == "test-identity"
+        assert args.log_level == "INFO"  # Default
 
-    def test_parse_args_openshift_mode(self):
+    def test_parse_args_openshift_mode(self, mocker: MockerFixture):
         """Test parsing arguments for OpenShift mode."""
         test_args = [
             "--mode",
@@ -51,25 +51,25 @@ class TestParseArgs:
             "https://example.com",
         ]
 
-        with patch("sys.argv", ["main.py"] + test_args):
-            args = parse_args()
+        mocker.patch("sys.argv", ["main.py"] + test_args)
+        args = parse_args()
 
-            assert args.mode == "openshift"
-            assert args.data_dir == Path("/tmp")
-            assert args.service_id == "test-service"
-            assert args.ingress_server_url == "https://example.com"
+        assert args.mode == "openshift"
+        assert args.data_dir == Path("/tmp")
+        assert args.service_id == "test-service"
+        assert args.ingress_server_url == "https://example.com"
 
-    def test_parse_args_with_config_file(self):
+    def test_parse_args_with_config_file(self, mocker: MockerFixture):
         """Test parsing arguments with config file."""
         test_args = ["--config", "/path/to/config.yaml", "--log-level", "DEBUG"]
 
-        with patch("sys.argv", ["main.py"] + test_args):
-            args = parse_args()
+        mocker.patch("sys.argv", ["main.py"] + test_args)
+        args = parse_args()
 
-            assert args.config == Path("/path/to/config.yaml")
-            assert args.log_level == "DEBUG"
+        assert args.config == Path("/path/to/config.yaml")
+        assert args.log_level == "DEBUG"
 
-    def test_parse_args_all_options(self):
+    def test_parse_args_all_options(self, mocker: MockerFixture):
         """Test parsing all possible arguments."""
         test_args = [
             "--mode",
@@ -95,46 +95,46 @@ class TestParseArgs:
             "WARNING",
         ]
 
-        with patch("sys.argv", ["main.py"] + test_args):
-            args = parse_args()
+        mocker.patch("sys.argv", ["main.py"] + test_args)
+        args = parse_args()
 
-            assert args.mode == "manual"
-            assert args.config == Path("/path/to/config.yaml")
-            assert args.data_dir == Path("/data")
-            assert args.service_id == "full-service"
-            assert args.ingress_server_url == "https://full.example.com"
-            assert args.ingress_server_auth_token == "full-token"
-            assert args.identity_id == "full-identity"
-            assert args.collection_interval == 600
-            assert args.ingress_connection_timeout == 60
-            assert args.no_cleanup is True
-            assert args.log_level == "WARNING"
+        assert args.mode == "manual"
+        assert args.config == Path("/path/to/config.yaml")
+        assert args.data_dir == Path("/data")
+        assert args.service_id == "full-service"
+        assert args.ingress_server_url == "https://full.example.com"
+        assert args.ingress_server_auth_token == "full-token"
+        assert args.identity_id == "full-identity"
+        assert args.collection_interval == 600
+        assert args.ingress_connection_timeout == 60
+        assert args.no_cleanup is True
+        assert args.log_level == "WARNING"
 
-    def test_parse_args_invalid_mode(self):
+    def test_parse_args_invalid_mode(self, mocker: MockerFixture):
         """Test parsing with invalid authentication mode."""
         test_args = ["--mode", "invalid-mode"]
 
-        with patch("sys.argv", ["main.py"] + test_args):
-            with pytest.raises(SystemExit):
-                parse_args()
+        mocker.patch("sys.argv", ["main.py"] + test_args)
+        with pytest.raises(SystemExit):
+            parse_args()
 
-    def test_parse_args_invalid_log_level(self):
+    def test_parse_args_invalid_log_level(self, mocker: MockerFixture):
         """Test parsing with invalid log level."""
         test_args = ["--log-level", "INVALID"]
 
-        with patch("sys.argv", ["main.py"] + test_args):
-            with pytest.raises(SystemExit):
-                parse_args()
+        mocker.patch("sys.argv", ["main.py"] + test_args)
+        with pytest.raises(SystemExit):
+            parse_args()
 
 
 class TestConfigureLogging:
     """Test cases for logging configuration."""
 
-    @patch("src.main.logging.basicConfig")
-    @patch("src.main.logging.getLogger")
-    def test_configure_logging_info_level(self, mock_get_logger, mock_basic_config):
+    def test_configure_logging_info_level(self, mocker: MockerFixture):
         """Test logging configuration with INFO level."""
-        mock_logger = Mock()
+        mock_basic_config = mocker.patch("src.main.logging.basicConfig")
+        mock_get_logger = mocker.patch("src.main.logging.getLogger")
+        mock_logger = mocker.Mock()
         mock_get_logger.return_value = mock_logger
 
         configure_logging("INFO")
@@ -148,11 +148,11 @@ class TestConfigureLogging:
         mock_get_logger.assert_any_call("kubernetes")
         mock_get_logger.assert_any_call("urllib3")
 
-    @patch("src.main.logging.basicConfig")
-    @patch("src.main.logging.getLogger")
-    def test_configure_logging_debug_level(self, mock_get_logger, mock_basic_config):
+    def test_configure_logging_debug_level(self, mocker: MockerFixture):
         """Test logging configuration with DEBUG level."""
-        mock_logger = Mock()
+        mock_basic_config = mocker.patch("src.main.logging.basicConfig")
+        mock_get_logger = mocker.patch("src.main.logging.getLogger")
+        mock_logger = mocker.Mock()
         mock_get_logger.return_value = mock_logger
 
         configure_logging("DEBUG")
@@ -165,26 +165,20 @@ class TestConfigureLogging:
 class TestMain:
     """Test cases for main function."""
 
-    @patch("src.main.parse_args")
-    @patch("src.main.configure_logging")
-    @patch(
-        "builtins.open",
-        new_callable=mock_open,
-        read_data="data_dir: /tmp\nservice_id: config-service\ningress_server_url: https://config.example.com\nidentity_id: config-identity\ncollection_interval: 300\ningress_connection_timeout: 30\ncleanup_after_send: true",
-    )
-    @patch("src.main.OpenShiftAuthProvider")
-    @patch("src.main.DataCollectorService")
-    def test_main_with_config_file_openshift_mode(
-        self,
-        mock_service_class,
-        mock_auth_provider,
-        mock_open_file,
-        mock_configure_logging,
-        mock_parse_args,
-    ):
+    def test_main_with_config_file_openshift_mode(self, mocker: MockerFixture):
         """Test main function with config file in OpenShift mode."""
         # Setup mocks
-        mock_args = Mock()
+        mock_parse_args = mocker.patch("src.main.parse_args")
+        mock_configure_logging = mocker.patch("src.main.configure_logging")
+        mock_open_file = mocker.patch(
+            "builtins.open",
+            new_callable=mocker.mock_open,
+            read_data="data_dir: /tmp\nservice_id: config-service\ningress_server_url: https://config.example.com\nidentity_id: config-identity\ncollection_interval: 300\ningress_connection_timeout: 30\ncleanup_after_send: true",
+        )
+        mock_auth_provider = mocker.patch("src.main.OpenShiftAuthProvider")
+        mock_service_class = mocker.patch("src.main.DataCollectorService")
+
+        mock_args = mocker.Mock()
         mock_args.mode = "openshift"
         mock_args.config = Path("/config.yaml")
         mock_args.log_level = "INFO"
@@ -202,14 +196,14 @@ class TestMain:
         mock_args.print_config_and_exit = False
         mock_parse_args.return_value = mock_args
 
-        mock_provider = Mock()
+        mock_provider = mocker.Mock()
         mock_auth_provider.return_value = mock_provider
         mock_provider.get_credentials.return_value = (
             "openshift-token",
             "openshift-identity",
         )
 
-        mock_service = Mock()
+        mock_service = mocker.Mock()
         mock_service_class.return_value = mock_service
 
         result = main()
@@ -230,15 +224,14 @@ class TestMain:
         assert created_settings.service_id == "config-service"
         assert created_settings.ingress_server_url == "https://config.example.com"
 
-    @patch("src.main.parse_args")
-    @patch("src.main.configure_logging")
-    @patch("src.main.DataCollectorService")
-    def test_main_without_config_manual_mode(
-        self, mock_service_class, mock_configure_logging, mock_parse_args
-    ):
+    def test_main_without_config_manual_mode(self, mocker: MockerFixture):
         """Test main function without config file in manual mode."""
         # Setup mocks
-        mock_args = Mock()
+        mock_parse_args = mocker.patch("src.main.parse_args")
+        mock_configure_logging = mocker.patch("src.main.configure_logging")
+        mock_service_class = mocker.patch("src.main.DataCollectorService")
+
+        mock_args = mocker.Mock()
         mock_args.mode = "manual"
         mock_args.config = None
         mock_args.log_level = "DEBUG"
@@ -256,7 +249,7 @@ class TestMain:
         mock_args.print_config_and_exit = False
         mock_parse_args.return_value = mock_args
 
-        mock_service = Mock()
+        mock_service = mocker.Mock()
         mock_service_class.return_value = mock_service
 
         result = main()
@@ -270,13 +263,12 @@ class TestMain:
         mock_configure_logging.assert_called_once_with("DEBUG", mock_args.rich_logs)
         mock_service.run.assert_called_once()
 
-    @patch("src.main.parse_args")
-    @patch("src.main.configure_logging")
-    def test_main_missing_required_args_manual_mode(
-        self, mock_configure_logging, mock_parse_args
-    ):
+    def test_main_missing_required_args_manual_mode(self, mocker: MockerFixture):
         """Test main function with missing required arguments in manual mode."""
-        mock_args = Mock()
+        mock_parse_args = mocker.patch("src.main.parse_args")
+        mocker.patch("src.main.configure_logging")
+
+        mock_args = mocker.Mock()
         mock_args.mode = "manual"
         mock_args.config = None
         mock_args.log_level = "INFO"
@@ -298,14 +290,13 @@ class TestMain:
 
         assert code == 1
 
-    @patch("src.main.parse_args")
-    @patch("src.main.configure_logging")
-    @patch("src.main.OpenShiftAuthProvider")
-    def test_main_authentication_error(
-        self, mock_auth_provider, mock_configure_logging, mock_parse_args
-    ):
+    def test_main_authentication_error(self, mocker: MockerFixture):
         """Test main function with authentication error."""
-        mock_args = Mock()
+        mock_parse_args = mocker.patch("src.main.parse_args")
+        mocker.patch("src.main.configure_logging")
+        mock_auth_provider = mocker.patch("src.main.OpenShiftAuthProvider")
+
+        mock_args = mocker.Mock()
         mock_args.mode = "openshift"
         mock_args.config = None
         mock_args.log_level = "INFO"
@@ -331,14 +322,13 @@ class TestMain:
 
         assert result == 1  # Error exit code
 
-    @patch("src.main.parse_args")
-    @patch("src.main.configure_logging")
-    @patch("src.main.DataCollectorService")
-    def test_main_keyboard_interrupt(
-        self, mock_service_class, mock_configure_logging, mock_parse_args
-    ):
+    def test_main_keyboard_interrupt(self, mocker: MockerFixture):
         """Test main function handles KeyboardInterrupt gracefully."""
-        mock_args = Mock()
+        mock_parse_args = mocker.patch("src.main.parse_args")
+        mocker.patch("src.main.configure_logging")
+        mock_service_class = mocker.patch("src.main.DataCollectorService")
+
+        mock_args = mocker.Mock()
         mock_args.mode = "manual"
         mock_args.config = None
         mock_args.log_level = "INFO"
@@ -356,7 +346,7 @@ class TestMain:
         mock_args.print_config_and_exit = False
         mock_parse_args.return_value = mock_args
 
-        mock_service = Mock()
+        mock_service = mocker.Mock()
         mock_service.run.side_effect = KeyboardInterrupt()
         mock_service_class.return_value = mock_service
 
@@ -364,14 +354,13 @@ class TestMain:
 
         assert result == 0  # Graceful exit
 
-    @patch("src.main.parse_args")
-    @patch("src.main.configure_logging")
-    @patch("src.main.DataCollectorService")
-    def test_main_unexpected_exception(
-        self, mock_service_class, mock_configure_logging, mock_parse_args
-    ):
+    def test_main_unexpected_exception(self, mocker: MockerFixture):
         """Test main function handles unexpected exceptions."""
-        mock_args = Mock()
+        mock_parse_args = mocker.patch("src.main.parse_args")
+        mocker.patch("src.main.configure_logging")
+        mock_service_class = mocker.patch("src.main.DataCollectorService")
+
+        mock_args = mocker.Mock()
         mock_args.mode = "manual"
         mock_args.config = None
         mock_args.log_level = "INFO"
@@ -389,7 +378,7 @@ class TestMain:
         mock_args.print_config_and_exit = False
         mock_parse_args.return_value = mock_args
 
-        mock_service = Mock()
+        mock_service = mocker.Mock()
         mock_service.run.side_effect = Exception("Unexpected error")
         mock_service_class.return_value = mock_service
 
@@ -397,9 +386,9 @@ class TestMain:
 
         assert result == 1  # Error exit code
 
-    def _create_minimal_args(self, **overrides):
+    def _create_minimal_args(self, mocker: MockerFixture, **overrides):
         """Helper to create minimal mock args with only required fields and test-specific overrides."""
-        mock_args = Mock()
+        mock_args = mocker.Mock()
         # Required fields for manual mode
         mock_args.mode = "manual"
         mock_args.config = None
@@ -424,23 +413,20 @@ class TestMain:
 
         return mock_args
 
-    @patch("src.main.parse_args")
-    @patch("src.main.configure_logging")
-    @patch("src.main.DataCollectorSettings")
-    @patch("src.main.DataCollectorService")
-    @patch.dict("os.environ", {"INGRESS_SERVER_AUTH_TOKEN": "env-token"})
-    def test_main_ingress_token_precedence_cli_over_env(
-        self,
-        mock_service_class,
-        mock_settings_class,
-        mock_configure_logging,
-        mock_parse_args,
-    ):
+    def test_main_ingress_token_precedence_cli_over_env(self, mocker: MockerFixture):
         """Test that CLI arg takes precedence over environment variable for auth token."""
-        mock_args = self._create_minimal_args(ingress_server_auth_token="cli-token")
+        mock_service_class = mocker.patch("src.main.DataCollectorService")
+        mock_settings_class = mocker.patch("src.main.DataCollectorSettings")
+        mocker.patch("src.main.configure_logging")
+        mock_parse_args = mocker.patch("src.main.parse_args")
+        mocker.patch.dict("os.environ", {"INGRESS_SERVER_AUTH_TOKEN": "env-token"})
+
+        mock_args = self._create_minimal_args(
+            mocker, ingress_server_auth_token="cli-token"
+        )
         mock_parse_args.return_value = mock_args
 
-        mock_service = Mock()
+        mock_service = mocker.Mock()
         mock_service_class.return_value = mock_service
 
         result = main()
@@ -452,25 +438,20 @@ class TestMain:
         call_kwargs = mock_settings_class.call_args[1]
         assert call_kwargs["ingress_server_auth_token"] == "cli-token"
 
-    @patch("src.main.parse_args")
-    @patch("src.main.configure_logging")
-    @patch("src.main.DataCollectorSettings")
-    @patch("src.main.DataCollectorService")
-    @patch.dict("os.environ", {"INGRESS_SERVER_AUTH_TOKEN": "env-token"})
-    def test_main_ingress_token_precedence_env_fallback(
-        self,
-        mock_service_class,
-        mock_settings_class,
-        mock_configure_logging,
-        mock_parse_args,
-    ):
+    def test_main_ingress_token_precedence_env_fallback(self, mocker: MockerFixture):
         """Test that environment variable is used when CLI arg not provided."""
-        mock_args = (
-            self._create_minimal_args()
+        mock_service_class = mocker.patch("src.main.DataCollectorService")
+        mock_settings_class = mocker.patch("src.main.DataCollectorSettings")
+        mocker.patch("src.main.configure_logging")
+        mock_parse_args = mocker.patch("src.main.parse_args")
+        mocker.patch.dict("os.environ", {"INGRESS_SERVER_AUTH_TOKEN": "env-token"})
+
+        mock_args = self._create_minimal_args(
+            mocker
         )  # ingress_server_auth_token defaults to None
         mock_parse_args.return_value = mock_args
 
-        mock_service = Mock()
+        mock_service = mocker.Mock()
         mock_service_class.return_value = mock_service
 
         result = main()
@@ -482,26 +463,21 @@ class TestMain:
         call_kwargs = mock_settings_class.call_args[1]
         assert call_kwargs["ingress_server_auth_token"] == "env-token"
 
-    @patch("src.main.parse_args")
-    @patch("src.main.configure_logging")
-    @patch(
-        "builtins.open",
-        new_callable=mock_open,
-        read_data="data_dir: /tmp\nservice_id: config-service\ningress_server_url: https://config.example.com\ningress_server_auth_token: config-token\nidentity_id: config-identity\ncollection_interval: 300",
-    )
-    @patch("src.main.DataCollectorSettings")
-    @patch("src.main.DataCollectorService")
-    @patch.dict("os.environ", {"INGRESS_SERVER_AUTH_TOKEN": "env-token"})
-    def test_main_ingress_token_precedence_env_over_config(
-        self,
-        mock_service_class,
-        mock_settings_class,
-        mock_open_file,
-        mock_configure_logging,
-        mock_parse_args,
-    ):
+    def test_main_ingress_token_precedence_env_over_config(self, mocker: MockerFixture):
         """Test that environment variable takes precedence over config file."""
+        mock_service_class = mocker.patch("src.main.DataCollectorService")
+        mock_settings_class = mocker.patch("src.main.DataCollectorSettings")
+        mocker.patch(
+            "builtins.open",
+            new_callable=mocker.mock_open,
+            read_data="data_dir: /tmp\nservice_id: config-service\ningress_server_url: https://config.example.com\ningress_server_auth_token: config-token\nidentity_id: config-identity\ncollection_interval: 300",
+        )
+        mocker.patch("src.main.configure_logging")
+        mock_parse_args = mocker.patch("src.main.parse_args")
+        mocker.patch.dict("os.environ", {"INGRESS_SERVER_AUTH_TOKEN": "env-token"})
+
         mock_args = self._create_minimal_args(
+            mocker,
             config=Path("/config.yaml"),
             data_dir=None,  # Let config provide this
             service_id=None,  # Let config provide this
@@ -509,7 +485,7 @@ class TestMain:
         )
         mock_parse_args.return_value = mock_args
 
-        mock_service = Mock()
+        mock_service = mocker.Mock()
         mock_service_class.return_value = mock_service
 
         result = main()
@@ -521,18 +497,14 @@ class TestMain:
         call_kwargs = mock_settings_class.call_args[1]
         assert call_kwargs["ingress_server_auth_token"] == "env-token"
 
-    @patch("src.main.parse_args")
-    @patch("src.main.configure_logging")
-    @patch("src.main.DataCollectorService")
-    @patch.dict("os.environ", {"INGRESS_SERVER_AUTH_TOKEN": "env-token"})
-    def test_main_config_defaults(
-        self,
-        mock_service_class,
-        mock_configure_logging,
-        mock_parse_args,
-    ):
+    def test_main_config_defaults(self, mocker: MockerFixture):
         """Test that config defaults take effect when not specified in other sources."""
-        mock_args = Mock()
+        mock_service_class = mocker.patch("src.main.DataCollectorService")
+        mocker.patch("src.main.configure_logging")
+        mock_parse_args = mocker.patch("src.main.parse_args")
+        mocker.patch.dict("os.environ", {"INGRESS_SERVER_AUTH_TOKEN": "env-token"})
+
+        mock_args = mocker.Mock()
         # Required fields for manual mode
         mock_args.mode = "manual"
         mock_args.config = None
@@ -552,7 +524,7 @@ class TestMain:
         mock_args.print_config_and_exit = False
         mock_parse_args.return_value = mock_args
 
-        mock_service = Mock()
+        mock_service = mocker.Mock()
         mock_service_class.return_value = mock_service
 
         result = main()

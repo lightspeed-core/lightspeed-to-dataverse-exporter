@@ -4,7 +4,7 @@ import tempfile
 from pathlib import Path
 import threading
 import time
-from unittest.mock import patch
+from pytest_mock import MockerFixture
 import io
 import requests
 import tarfile
@@ -202,10 +202,10 @@ def stop_service(service: DataCollectorService):
 class TestDataCollectorServiceRun:
     """Test cases for DataCollectorService.run method."""
 
-    @patch("src.file_handler.FileHandler.collect_files")
-    @patch("src.file_handler.FileHandler.gather_data_chunks")
-    def test_run_no_data_found(self, mock_gather, mock_collect):
+    def test_run_no_data_found(self, mocker: MockerFixture):
         """Test run method when no data is found."""
+        mock_gather = mocker.patch("src.file_handler.FileHandler.gather_data_chunks")
+        mock_collect = mocker.patch("src.file_handler.FileHandler.collect_files")
         mock_collect.return_value = []
         mock_gather.return_value = []
 
@@ -219,10 +219,10 @@ class TestDataCollectorServiceRun:
             mock_collect.assert_called()
             mock_gather.assert_called_with([])
 
-    @patch("src.file_handler.FileHandler.collect_files")
-    @patch("src.file_handler.FileHandler.gather_data_chunks")
-    def test_run_single_shot_mode(self, mock_gather, mock_collect):
+    def test_run_single_shot_mode(self, mocker: MockerFixture):
         """Test run method when no data is found."""
+        mock_gather = mocker.patch("src.file_handler.FileHandler.gather_data_chunks")
+        mock_collect = mocker.patch("src.file_handler.FileHandler.collect_files")
         mock_collect.return_value = []
         mock_gather.return_value = []
 
@@ -235,21 +235,17 @@ class TestDataCollectorServiceRun:
             mock_collect.assert_called()
             mock_gather.assert_called_with([])
 
-    @patch("src.file_handler.FileHandler.collect_files")
-    @patch("src.file_handler.FileHandler.gather_data_chunks")
-    @patch("src.data_exporter.package_files_into_tarball")
-    @patch("src.file_handler.FileHandler.delete_collected_files")
-    @patch("src.file_handler.FileHandler.ensure_size_limit")
-    def test_run_with_data_cleanup_enabled(
-        self,
-        mock_ensure,
-        mock_delete,
-        mock_package,
-        mock_gather,
-        mock_collect,
-    ):
+    def test_run_with_data_cleanup_enabled(self, mocker: MockerFixture):
         """Test run method with data and cleanup enabled."""
         # Setup mocks
+        mock_ensure = mocker.patch("src.file_handler.FileHandler.ensure_size_limit")
+        mock_delete = mocker.patch(
+            "src.file_handler.FileHandler.delete_collected_files"
+        )
+        mock_package = mocker.patch("src.data_exporter.package_files_into_tarball")
+        mock_gather = mocker.patch("src.file_handler.FileHandler.gather_data_chunks")
+        mock_collect = mocker.patch("src.file_handler.FileHandler.collect_files")
+
         mock_files = [(Path("/test/file1.json"), 100)]
         mock_collect.return_value = mock_files
         mock_chunks = [[Path("/test/file1.json")]]
@@ -260,9 +256,9 @@ class TestDataCollectorServiceRun:
             config = create_test_config(data_dir=Path(tmpdir))
             service = DataCollectorService(config)
 
-            with patch.object(service.ingress_client, "upload_tarball"):
-                threading.Thread(target=stop_service, args=[service]).start()
-                service.run()
+            mocker.patch.object(service.ingress_client, "upload_tarball")
+            threading.Thread(target=stop_service, args=[service]).start()
+            service.run()
 
             # Verify data processing workflow
             mock_collect.assert_called()
@@ -271,21 +267,17 @@ class TestDataCollectorServiceRun:
             mock_delete.assert_called_with([Path("/test/file1.json")])
             mock_ensure.assert_called_with(mock_files)
 
-    @patch("src.file_handler.FileHandler.collect_files")
-    @patch("src.file_handler.FileHandler.gather_data_chunks")
-    @patch("src.data_exporter.package_files_into_tarball")
-    @patch("src.file_handler.FileHandler.delete_collected_files")
-    @patch("src.file_handler.FileHandler.ensure_size_limit")
-    def test_run_with_data_cleanup_disabled(
-        self,
-        mock_ensure,
-        mock_delete,
-        mock_package,
-        mock_gather,
-        mock_collect,
-    ):
+    def test_run_with_data_cleanup_disabled(self, mocker: MockerFixture):
         """Test run method with data but cleanup disabled."""
         # Setup mocks
+        mock_ensure = mocker.patch("src.file_handler.FileHandler.ensure_size_limit")
+        mock_delete = mocker.patch(
+            "src.file_handler.FileHandler.delete_collected_files"
+        )
+        mock_package = mocker.patch("src.data_exporter.package_files_into_tarball")
+        mock_gather = mocker.patch("src.file_handler.FileHandler.gather_data_chunks")
+        mock_collect = mocker.patch("src.file_handler.FileHandler.collect_files")
+
         mock_files = [(Path("/test/file1.json"), 100)]
         mock_collect.return_value = mock_files
         mock_chunks = [[Path("/test/file1.json")]]
@@ -296,19 +288,19 @@ class TestDataCollectorServiceRun:
             config = create_test_config(data_dir=Path(tmpdir), cleanup_after_send=False)
             service = DataCollectorService(config)
 
-            with patch.object(service.ingress_client, "upload_tarball"):
-                threading.Thread(target=stop_service, args=[service]).start()
-                service.run()
+            mocker.patch.object(service.ingress_client, "upload_tarball")
+            threading.Thread(target=stop_service, args=[service]).start()
+            service.run()
 
             # Verify cleanup functions are not called
             mock_delete.assert_not_called()
             mock_ensure.assert_not_called()
 
-    @patch("src.file_handler.FileHandler.collect_files")
-    @patch("src.data_exporter.logger")
-    def test_run_handles_os_error(self, mock_logger, mock_collect):
+    def test_run_handles_os_error(self, mocker: MockerFixture):
         """Test run method handles OSError gracefully."""
         # Mock collect_files to raise OSError
+        mock_logger = mocker.patch("src.data_exporter.logger")
+        mock_collect = mocker.patch("src.file_handler.FileHandler.collect_files")
         mock_collect.side_effect = [OSError("File system error"), KeyboardInterrupt()]
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -323,11 +315,11 @@ class TestDataCollectorServiceRun:
             error_call = mock_logger.error.call_args[0]
             assert "Error during data collection" in error_call[0]
 
-    @patch("src.file_handler.FileHandler.collect_files")
-    @patch("src.data_exporter.logger")
-    def test_run_handles_request_exception(self, mock_logger, mock_collect):
+    def test_run_handles_request_exception(self, mocker: MockerFixture):
         """Test run method handles RequestException gracefully."""
         # Mock to raise RequestException first, then KeyboardInterrupt to exit
+        mock_logger = mocker.patch("src.data_exporter.logger")
+        mock_collect = mocker.patch("src.file_handler.FileHandler.collect_files")
         mock_collect.side_effect = [
             requests.RequestException("Network error"),
             KeyboardInterrupt(),
@@ -345,10 +337,12 @@ class TestDataCollectorServiceRun:
             error_call = mock_logger.error.call_args[0]
             assert "Error during data collection" in error_call[0]
 
-    @patch("src.file_handler.FileHandler.collect_files")
-    def test_run_handles_request_exception_in_single_shot_mode(self, mock_collect):
+    def test_run_handles_request_exception_in_single_shot_mode(
+        self, mocker: MockerFixture
+    ):
         """Test run method handles RequestException gracefully."""
         # Mock to raise RequestException first, then KeyboardInterrupt to exit
+        mock_collect = mocker.patch("src.file_handler.FileHandler.collect_files")
         mock_collect.side_effect = [
             requests.RequestException("Network error"),
         ]
@@ -366,11 +360,11 @@ class TestDataCollectorServiceRun:
                     False
                 ), "service should have reraised exception when in single shot mode"
 
-    @patch("src.file_handler.FileHandler.collect_files")
-    @patch("src.data_exporter.logger")
-    def test_retry_uses_correct_interval(self, mock_logger, mock_collect):
+    def test_retry_uses_correct_interval(self, mocker: MockerFixture):
         """Test that retry logic uses configurable retry_interval."""
         # Mock collect_files to raise an exception on first call, then KeyboardInterrupt
+        mock_logger = mocker.patch("src.data_exporter.logger")
+        mock_collect = mocker.patch("src.file_handler.FileHandler.collect_files")
         call_count = 0
 
         def mock_collect_side_effect():
@@ -392,16 +386,16 @@ class TestDataCollectorServiceRun:
             service = DataCollectorService(config)
 
             # Mock the shutdown_event.wait method to capture the retry interval
-            with patch.object(service.shutdown_event, "wait") as mock_wait:
-                # First call returns False (not set), second call can return True or raise KeyboardInterrupt
-                mock_wait.side_effect = [False, KeyboardInterrupt()]
+            mock_wait = mocker.patch.object(service.shutdown_event, "wait")
+            # First call returns False (not set), second call can return True or raise KeyboardInterrupt
+            mock_wait.side_effect = [False, KeyboardInterrupt()]
 
-                service.run()
+            service.run()
 
-                # Verify that wait was called with the correct retry interval
-                mock_wait.assert_called_with(custom_retry_interval)
+            # Verify that wait was called with the correct retry interval
+            mock_wait.assert_called_with(custom_retry_interval)
 
-                # Verify the log message includes the correct interval
-                mock_logger.info.assert_any_call(
-                    "Retrying data collection in %d seconds...", custom_retry_interval
-                )
+            # Verify the log message includes the correct interval
+            mock_logger.info.assert_any_call(
+                "Retrying data collection in %d seconds...", custom_retry_interval
+            )
