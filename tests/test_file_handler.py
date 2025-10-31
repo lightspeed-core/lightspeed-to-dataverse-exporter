@@ -84,6 +84,145 @@ class TestDeleteFiles:
                 "Failed to remove '%s'", test_file
             )
 
+    def test_delete_files_removes_empty_directories(self, tmp_path, caplog):
+        """Test that empty directories are removed after file deletion."""
+        # Create nested directory structure
+        data_dir = tmp_path / "data"
+        subdir1 = data_dir / "subdir1"
+        subdir2 = subdir1 / "subdir2"
+        subdir2.mkdir(parents=True)
+
+        # Create file in nested directory
+        file1 = subdir2 / "test.json"
+        file1.write_text('{"test": 1}')
+
+        assert file1.exists()
+        assert subdir2.exists()
+        assert subdir1.exists()
+        assert data_dir.exists()
+
+        # Delete file with root_dir specified
+        with caplog.at_level(logging.DEBUG):
+            delete_files([file1], root_dir=data_dir)
+
+        # File should be deleted
+        assert not file1.exists()
+        # Empty parent directories should be removed
+        assert not subdir2.exists()
+        assert not subdir1.exists()
+        # Root directory should remain
+        assert data_dir.exists()
+        assert "Removing empty directory" in caplog.text
+
+    def test_delete_files_preserves_non_empty_directories(self, tmp_path):
+        """Test that non-empty directories are not removed."""
+        # Create nested directory structure
+        data_dir = tmp_path / "data"
+        subdir1 = data_dir / "subdir1"
+        subdir2 = subdir1 / "subdir2"
+        subdir2.mkdir(parents=True)
+
+        # Create two files
+        file1 = subdir2 / "test1.json"
+        file2 = subdir1 / "test2.json"
+        file1.write_text('{"test": 1}')
+        file2.write_text('{"test": 2}')
+
+        # Delete only one file
+        delete_files([file1], root_dir=data_dir)
+
+        # File should be deleted
+        assert not file1.exists()
+        # subdir2 should be removed (empty)
+        assert not subdir2.exists()
+        # subdir1 should remain (has file2)
+        assert subdir1.exists()
+        assert file2.exists()
+        # Root directory should remain
+        assert data_dir.exists()
+
+    def test_delete_files_never_removes_root_dir(self, tmp_path):
+        """Test that root_dir is never removed even if empty."""
+        # Create file directly in root_dir
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+        file1 = data_dir / "test.json"
+        file1.write_text('{"test": 1}')
+
+        # Delete file
+        delete_files([file1], root_dir=data_dir)
+
+        # File should be deleted
+        assert not file1.exists()
+        # Root directory should remain even though it's empty
+        assert data_dir.exists()
+
+    def test_delete_files_stops_at_root_boundary(self, tmp_path):
+        """Test that cleanup stops at root_dir boundary."""
+        # Create structure with directories outside root
+        outside_dir = tmp_path / "outside"
+        data_dir = tmp_path / "data"
+        subdir = data_dir / "subdir"
+        subdir.mkdir(parents=True)
+        outside_dir.mkdir()
+
+        # Create file in subdir
+        file1 = subdir / "test.json"
+        file1.write_text('{"test": 1}')
+
+        # Delete file
+        delete_files([file1], root_dir=data_dir)
+
+        # File and subdir should be deleted
+        assert not file1.exists()
+        assert not subdir.exists()
+        # Outside directory should remain untouched
+        assert outside_dir.exists()
+        # Root directory should remain
+        assert data_dir.exists()
+
+    def test_delete_files_backward_compatible_no_root_dir(self, tmp_path):
+        """Test backward compatibility when root_dir is not provided."""
+        # Create nested directory structure
+        subdir = tmp_path / "subdir"
+        subdir.mkdir()
+        file1 = subdir / "test.json"
+        file1.write_text('{"test": 1}')
+
+        # Delete file without root_dir
+        delete_files([file1])
+
+        # File should be deleted
+        assert not file1.exists()
+        # Directory should remain (backward compatible behavior)
+        assert subdir.exists()
+
+    def test_delete_files_handles_multiple_files_in_different_dirs(self, tmp_path):
+        """Test cleanup when deleting multiple files in different directories."""
+        data_dir = tmp_path / "data"
+        subdir1 = data_dir / "subdir1"
+        subdir2 = data_dir / "subdir2"
+        subdir1.mkdir(parents=True)
+        subdir2.mkdir(parents=True)
+
+        # Create one file in each subdirectory
+        file1 = subdir1 / "test1.json"
+        file2 = subdir2 / "test2.json"
+        file1.write_text('{"test": 1}')
+        file2.write_text('{"test": 2}')
+
+        # Delete both files
+        delete_files([file1, file2], root_dir=data_dir)
+
+        # Both files should be deleted
+        assert not file1.exists()
+        assert not file2.exists()
+        # Both empty subdirectories should be removed
+        assert not subdir1.exists()
+        assert not subdir2.exists()
+        # Root directory should remain
+        assert data_dir.exists()
+
 
 class TestFilterSymlinks:
     """Tests for the filter_symlinks standalone function."""
@@ -500,12 +639,41 @@ class TestFileHandler:
 
     @patch("src.file_handler.delete_files")
     def test_delete_collected_files(self, mock_delete_files, handler):
-        """Test delete_collected_files wrapper method."""
+        """Test delete_collected_files wrapper method passes root_dir."""
         test_files = [Path("file1.json"), Path("file2.json")]
 
         handler.delete_collected_files(test_files)
 
-        mock_delete_files.assert_called_once_with(test_files)
+        # Should pass root_dir parameter
+        mock_delete_files.assert_called_once_with(test_files, root_dir=handler.data_dir)
+
+    def test_delete_collected_files_removes_empty_directories(
+        self, handler, temp_data_dir
+    ):
+        """Test that delete_collected_files removes empty directories."""
+        # Create nested directory structure
+        subdir1 = temp_data_dir / "subdir1"
+        subdir2 = subdir1 / "subdir2"
+        subdir2.mkdir(parents=True)
+
+        # Create file in nested directory
+        file1 = subdir2 / "test.json"
+        file1.write_text('{"test": 1}')
+
+        assert file1.exists()
+        assert subdir2.exists()
+        assert subdir1.exists()
+
+        # Delete file using delete_collected_files
+        handler.delete_collected_files([file1])
+
+        # File should be deleted
+        assert not file1.exists()
+        # Empty parent directories should be removed
+        assert not subdir2.exists()
+        assert not subdir1.exists()
+        # Root directory should remain
+        assert temp_data_dir.exists()
 
     @patch("src.file_handler.delete_files")
     def test_ensure_size_limit_under_limit(self, mock_delete_files, handler, caplog):
@@ -537,7 +705,9 @@ class TestFileHandler:
             handler.ensure_size_limit(collected_files)
 
         # Should delete the first file (80 bytes removed, bringing total to 60 < 100)
-        mock_delete_files.assert_called_once_with([Path("file1.json")])
+        mock_delete_files.assert_called_once_with(
+            [Path("file1.json")], root_dir=handler.data_dir
+        )
         assert (
             "Data folder size is bigger than the maximum allowed size: 140 > 100"
             in caplog.text
@@ -561,7 +731,10 @@ class TestFileHandler:
             handler.ensure_size_limit(collected_files)
 
         # Should delete first two files (70 bytes removed, bringing total to 20 < 50)
-        expected_calls = [call([Path("file1.json")]), call([Path("file2.json")])]
+        expected_calls = [
+            call([Path("file1.json")], root_dir=handler.data_dir),
+            call([Path("file2.json")], root_dir=handler.data_dir),
+        ]
         mock_delete_files.assert_has_calls(expected_calls)
 
 

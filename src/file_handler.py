@@ -13,16 +13,67 @@ from src.constants import MAX_PAYLOAD_SIZE, MAX_DATA_DIR_SIZE
 logger = logging.getLogger(__name__)
 
 
-def delete_files(file_paths: list[pathlib.Path]) -> None:
+def _cleanup_empty_directories(dir_path: pathlib.Path, root_dir: pathlib.Path) -> None:
+    """Recursively remove empty directories up to (but not including) root_dir.
+
+    Args:
+        dir_path: Directory path to check and potentially remove.
+        root_dir: Root directory boundary. Directories will not be removed
+            if they reach or would exceed this root.
+    """
+    # Stop if we've reached the root directory
+    if dir_path == root_dir:
+        return
+
+    # Stop if dir_path is not a descendant of root_dir
+    try:
+        dir_path.relative_to(root_dir)
+    except ValueError:
+        # dir_path is not within root_dir, stop cleanup
+        return
+
+    try:
+        # Only attempt to remove if directory exists and is empty
+        if dir_path.exists() and dir_path.is_dir():
+            # Check if directory is empty (no files or subdirectories)
+            try:
+                next(dir_path.iterdir())
+                # Directory is not empty, stop here
+                return
+            except StopIteration:
+                # Directory is empty, remove it
+                logger.debug("Removing empty directory '%s'", dir_path)
+                dir_path.rmdir()
+                # Recursively check parent directory
+                _cleanup_empty_directories(dir_path.parent, root_dir)
+        elif dir_path.exists():
+            # Path exists but is not a directory, stop here
+            return
+    except OSError as e:
+        logger.debug(
+            "Failed to remove empty directory '%s': %s (may not be empty)", dir_path, e
+        )
+
+
+def delete_files(
+    file_paths: list[pathlib.Path], root_dir: pathlib.Path | None = None
+) -> None:
     """Delete files from the provided paths.
+
+    After deleting each file, if root_dir is provided, recursively removes empty
+    parent directories up to (but not including) the root_dir.
 
     Args:
         file_paths: List of paths to the files to be deleted.
+        root_dir: Optional root directory for cleanup. If provided, empty parent
+            directories will be removed up to this root. If None, only files are deleted.
     """
     for file_path in file_paths:
         logger.debug("Removing '%s'", file_path)
+        file_deleted = False
         try:
             file_path.unlink()
+            file_deleted = True
         except FileNotFoundError:
             logger.debug("File '%s' already deleted or does not exist", file_path)
         except OSError as e:
@@ -30,6 +81,13 @@ def delete_files(file_paths: list[pathlib.Path]) -> None:
         else:
             if file_path.exists():
                 logger.error("Failed to remove '%s'", file_path)
+
+        # Clean up empty parent directories if root_dir is provided and file was deleted
+        # NOTE: Per-file cleanup is sufficient for expected volumes (hundreds of files).
+        # If performance issues arise with higher volumes, consider batching: collect all
+        # parent directories first, then do a single cleanup sweep after all files are deleted.
+        if file_deleted and root_dir is not None:
+            _cleanup_empty_directories(file_path.parent, root_dir)
 
 
 def filter_symlinks(files: list[pathlib.Path]) -> list[pathlib.Path]:
@@ -184,10 +242,13 @@ class FileHandler:
     def delete_collected_files(self, file_paths: list[pathlib.Path]) -> None:
         """Delete files from the provided paths.
 
+        After deletion, empty parent directories will be recursively removed
+        up to the data directory root.
+
         Args:
             file_paths: List of paths to the files to be deleted.
         """
-        delete_files(file_paths)
+        delete_files(file_paths, root_dir=self.data_dir)
 
     def ensure_size_limit(self, collected_files: list[tuple[Path, int]]) -> None:
         """Safeguard to prevent data directory overflow when export/cleanup fails.
