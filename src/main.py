@@ -34,10 +34,11 @@ class Args(argparse.Namespace):
     retry_interval: int | None
     no_cleanup: bool
     allowed_subdirs: list[str] | None
-    log_level: str
+    log_level: str | None
     rich_logs: bool
     client_id: str | None
     client_secret: str | None
+    print_config_and_exit: bool
 
 
 logger = logging.getLogger(__name__)
@@ -123,8 +124,8 @@ def parse_args() -> Args:
     parser.add_argument(
         "--log-level",
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
-        default="INFO",
-        help="Set the logging level",
+        default=None,
+        help="Set the logging level (default: INFO, or value from config file if specified)",
     )
 
     parser.add_argument(
@@ -216,13 +217,33 @@ def main() -> int:
     """Main function."""
     args = parse_args()
 
-    configure_logging(args.log_level, args.rich_logs)
+    # Load config file early if specified, so we can use logging settings from it
+    config_dict = {}
+    if args.config:
+        try:
+            with open(args.config, "r", encoding="utf-8") as f:
+                config_dict = yaml.safe_load(f) or {}
+        except Exception as e:
+            # Can't use logger yet since logging isn't configured
+            print(
+                f"Error loading config file {args.config}: {type(e).__name__}: {e}",
+                file=sys.stderr,
+            )
+            return 1
+
+    # Configure logging with priority: CLI args > YAML config > defaults
+    config_log_level = config_dict.get("log_level")
+    if config_log_level and isinstance(config_log_level, str):
+        config_log_level = config_log_level.upper()
+
+    log_level = first_not_none(args.log_level, config_log_level, "INFO")
+    rich_logs = args.rich_logs or config_dict.get("rich_logs", False)
+
+    configure_logging(log_level, rich_logs)
 
     logger.info("Starting Lightspeed to Dataverse exporter (mode: %s)", args.mode)
 
     try:
-        config_dict = {}
-
         auth_token: str | None = None
         identity_id: str | None = None
 
@@ -253,9 +274,7 @@ def main() -> int:
             auth_token, identity_id = provider.get_credentials()
 
         if args.config:
-            logger.info("Loading configuration from %s", args.config)
-            with open(args.config, "r", encoding="utf-8") as f:
-                config_dict = yaml.safe_load(f)
+            logger.info("Using configuration from %s", args.config)
 
         config = DataCollectorSettings(
             data_dir=first_not_none(args.data_dir, config_dict.get("data_dir")),

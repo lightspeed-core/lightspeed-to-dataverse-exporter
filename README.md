@@ -26,6 +26,10 @@ service_id: "your-service-id"
 ingress_server_url: "https://console.redhat.com/api/ingress/v1/upload"
 collection_interval: 3600  # 1 hour (set to 0 for single-shot mode)
 cleanup_after_send: true
+
+# Optional logging settings
+log_level: "INFO"  # Options: DEBUG, INFO, WARNING, ERROR
+rich_logs: false   # Enable rich colored logging output
 ```
 
 **Option 2: Using command-line arguments only**
