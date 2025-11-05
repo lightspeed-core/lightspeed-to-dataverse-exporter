@@ -128,7 +128,7 @@ durationpy==0.10 \
     --hash=sha256:1fa6893409a6e739c9c72334fc65cca1f355dbdd93405d30f726deb5bde42fba \
     --hash=sha256:3b41e1b601234296b4fb368338fdcd3e13e0b4fb5b67345948f4f2bf9868b286
     # via kubernetes
-gherkin-official==29.0.0 \
+gherkin-official==36.1.0 \
     --hash=sha256:26967b0d537a302119066742669e0e8b663e632769330be675457ae993e1d1bc \
     --hash=sha256:dbea32561158f02280d7579d179b019160d072ce083197625e2f80a6776bb9eb
     # via pytest-bdd
