@@ -126,6 +126,23 @@ class TestParseArgs:
             with pytest.raises(SystemExit):
                 parse_args()
 
+    def test_parse_args_allowed_subdirs_requires_value(self):
+        """Test that --allowed-subdirs requires at least one value when provided."""
+        test_args = ["--allowed-subdirs"]
+
+        with patch("sys.argv", ["main.py"] + test_args):
+            with pytest.raises(SystemExit):
+                parse_args()
+
+    def test_parse_args_allowed_subdirs_with_values(self):
+        """Test parsing --allowed-subdirs with values."""
+        test_args = ["--allowed-subdirs", "logs", "metrics"]
+
+        with patch("sys.argv", ["main.py"] + test_args):
+            args = parse_args()
+
+            assert args.allowed_subdirs == ["logs", "metrics"]
+
 
 class TestConfigureLogging:
     """Test cases for logging configuration."""

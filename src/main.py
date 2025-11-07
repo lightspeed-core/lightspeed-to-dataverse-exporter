@@ -117,8 +117,8 @@ def parse_args() -> Args:
 
     parser.add_argument(
         "--allowed-subdirs",
-        nargs="*",
-        help="List of allowed subdirectories to collect from (space-separated). If not specified, uses default subdirs from config.",
+        nargs="+",
+        help="List of allowed subdirectories to collect from (space-separated). Requires at least one value. If not specified, uses default subdirs from config.",
     )
 
     parser.add_argument(
