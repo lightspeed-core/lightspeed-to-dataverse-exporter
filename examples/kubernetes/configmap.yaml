@@ -17,6 +17,10 @@ data:
     cleanup_after_send: true
     ingress_connection_timeout: 30
     
+    # Logging settings (optional)
+    log_level: "INFO"  # Options: DEBUG, INFO, WARNING, ERROR
+    rich_logs: false   # Enable rich colored logging output
+    
     # Note: ingress_server_auth_token and identity_id are automatically 
     # retrieved from the OpenShift cluster in openshift mode
   

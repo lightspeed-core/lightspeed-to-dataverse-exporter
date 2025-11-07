@@ -36,7 +36,7 @@ class TestParseArgs:
             assert args.ingress_server_url == "https://example.com"
             assert args.ingress_server_auth_token == "test-token"
             assert args.identity_id == "test-identity"
-            assert args.log_level == "INFO"  # Default
+            assert args.log_level is None  # Default (resolved to INFO in main())
 
     def test_parse_args_openshift_mode(self):
         """Test parsing arguments for OpenShift mode."""
@@ -187,7 +187,7 @@ class TestMain:
         mock_args = Mock()
         mock_args.mode = "openshift"
         mock_args.config = Path("/config.yaml")
-        mock_args.log_level = "INFO"
+        mock_args.log_level = None  # Not specified in CLI
         mock_args.data_dir = None
         mock_args.service_id = None
         mock_args.ingress_server_url = None
@@ -215,7 +215,8 @@ class TestMain:
         result = main()
 
         assert result == 0
-        mock_configure_logging.assert_called_once_with("INFO", mock_args.rich_logs)
+        # log_level defaults to "INFO" since not in CLI or config
+        mock_configure_logging.assert_called_once_with("INFO", False)
         mock_open_file.assert_called_once_with(
             Path("/config.yaml"), "r", encoding="utf-8"
         )
@@ -279,7 +280,7 @@ class TestMain:
         mock_args = Mock()
         mock_args.mode = "manual"
         mock_args.config = None
-        mock_args.log_level = "INFO"
+        mock_args.log_level = None
         mock_args.data_dir = None  # Missing required arg
         mock_args.service_id = "test-service"
         mock_args.ingress_server_url = "https://test.example.com"
@@ -308,7 +309,7 @@ class TestMain:
         mock_args = Mock()
         mock_args.mode = "openshift"
         mock_args.config = None
-        mock_args.log_level = "INFO"
+        mock_args.log_level = None
         mock_args.data_dir = Path("/tmp")
         mock_args.service_id = "test-service"
         mock_args.ingress_server_url = "https://test.example.com"
@@ -341,7 +342,7 @@ class TestMain:
         mock_args = Mock()
         mock_args.mode = "manual"
         mock_args.config = None
-        mock_args.log_level = "INFO"
+        mock_args.log_level = None
         mock_args.data_dir = Path("/tmp")
         mock_args.service_id = "test-service"
         mock_args.ingress_server_url = "https://test.example.com"
@@ -374,7 +375,7 @@ class TestMain:
         mock_args = Mock()
         mock_args.mode = "manual"
         mock_args.config = None
-        mock_args.log_level = "INFO"
+        mock_args.log_level = None
         mock_args.data_dir = Path("/tmp")
         mock_args.service_id = "test-service"
         mock_args.ingress_server_url = "https://test.example.com"
@@ -403,7 +404,7 @@ class TestMain:
         # Required fields for manual mode
         mock_args.mode = "manual"
         mock_args.config = None
-        mock_args.log_level = "INFO"
+        mock_args.log_level = None
         mock_args.data_dir = Path("/tmp")
         mock_args.service_id = "test-service"
         mock_args.ingress_server_url = "https://test.example.com"
@@ -536,7 +537,7 @@ class TestMain:
         # Required fields for manual mode
         mock_args.mode = "manual"
         mock_args.config = None
-        mock_args.log_level = "INFO"
+        mock_args.log_level = None
         mock_args.data_dir = Path("/tmp")
         mock_args.service_id = "test-service"
         mock_args.ingress_server_url = "https://test.example.com"
@@ -569,3 +570,110 @@ class TestMain:
         assert settings.ingress_connection_timeout == 30  # Default from constants
         assert settings.retry_interval == 300  # Default from constants
         assert settings.allowed_subdirs == []  # Default: collect everything
+
+    @patch("src.main.parse_args")
+    @patch("src.main.configure_logging")
+    @patch(
+        "builtins.open",
+        new_callable=mock_open,
+        read_data="data_dir: /tmp\nservice_id: config-service\ningress_server_url: https://config.example.com\nlog_level: DEBUG\nrich_logs: true",
+    )
+    @patch("src.main.DataCollectorService")
+    def test_main_logging_from_config_file(
+        self,
+        mock_service_class,
+        mock_open_file,
+        mock_configure_logging,
+        mock_parse_args,
+    ):
+        """Test that logging settings are loaded from config file."""
+        mock_args = self._create_minimal_args(
+            config=Path("/config.yaml"),
+            data_dir=None,  # Let config provide this
+            service_id=None,  # Let config provide this
+            ingress_server_url=None,  # Let config provide this
+            ingress_server_auth_token="test-token",
+        )
+        mock_parse_args.return_value = mock_args
+
+        mock_service = Mock()
+        mock_service_class.return_value = mock_service
+
+        result = main()
+
+        assert result == 0
+        # Verify logging was configured with values from config file
+        mock_configure_logging.assert_called_once_with("DEBUG", True)
+        mock_service.run.assert_called_once()
+
+    @patch("src.main.parse_args")
+    @patch("src.main.configure_logging")
+    @patch(
+        "builtins.open",
+        new_callable=mock_open,
+        read_data="data_dir: /tmp\nservice_id: config-service\ningress_server_url: https://config.example.com\nlog_level: WARNING\nrich_logs: false",
+    )
+    @patch("src.main.DataCollectorService")
+    def test_main_logging_cli_overrides_config(
+        self,
+        mock_service_class,
+        mock_open_file,
+        mock_configure_logging,
+        mock_parse_args,
+    ):
+        """Test that CLI logging settings override config file."""
+        mock_args = self._create_minimal_args(
+            config=Path("/config.yaml"),
+            log_level="ERROR",  # Override config file's WARNING
+            rich_logs=True,  # Override config file's false
+            data_dir=None,  # Let config provide this
+            service_id=None,  # Let config provide this
+            ingress_server_url=None,  # Let config provide this
+            ingress_server_auth_token="test-token",
+        )
+        mock_parse_args.return_value = mock_args
+
+        mock_service = Mock()
+        mock_service_class.return_value = mock_service
+
+        result = main()
+
+        assert result == 0
+        # Verify logging was configured with CLI values, not config values
+        mock_configure_logging.assert_called_once_with("ERROR", True)
+        mock_service.run.assert_called_once()
+
+    @patch("src.main.parse_args")
+    @patch("src.main.configure_logging")
+    @patch(
+        "builtins.open",
+        new_callable=mock_open,
+        read_data="data_dir: /tmp\nservice_id: config-service\ningress_server_url: https://config.example.com\nlog_level: debug\nrich_logs: true",
+    )
+    @patch("src.main.DataCollectorService")
+    def test_main_logging_case_insensitive_from_config(
+        self,
+        mock_service_class,
+        mock_open_file,
+        mock_configure_logging,
+        mock_parse_args,
+    ):
+        """Test that log_level from config file is case-insensitive."""
+        mock_args = self._create_minimal_args(
+            config=Path("/config.yaml"),
+            data_dir=None,  # Let config provide this
+            service_id=None,  # Let config provide this
+            ingress_server_url=None,  # Let config provide this
+            ingress_server_auth_token="test-token",
+        )
+        mock_parse_args.return_value = mock_args
+
+        mock_service = Mock()
+        mock_service_class.return_value = mock_service
+
+        result = main()
+
+        assert result == 0
+        # Verify lowercase "debug" from config is uppercased to "DEBUG"
+        mock_configure_logging.assert_called_once_with("DEBUG", True)
+        mock_service.run.assert_called_once()

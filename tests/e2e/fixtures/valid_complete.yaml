@@ -8,3 +8,5 @@ ingress_connection_timeout: 30
 retry_interval: 300
 cleanup_after_send: true
 allowed_subdirs: ["logs", "metrics"]
+log_level: "INFO"  # Optional: DEBUG, INFO, WARNING, ERROR
+rich_logs: false   # Optional: Enable rich colored logging output

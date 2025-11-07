@@ -18,3 +18,7 @@ identity_id: "unknown"                    # Identifier for this instance
 collection_interval: 300                 # Collection interval in seconds (5 minutes)
 cleanup_after_send: true                 # Remove files after successful upload
 ingress_connection_timeout: 30           # HTTP timeout in seconds
+
+# Logging settings (optional)
+log_level: "INFO"                        # Options: DEBUG, INFO, WARNING, ERROR
+rich_logs: false                         # Enable rich colored logging output
