@@ -432,17 +432,59 @@ class TestFileHandler:
         assert unknown_file not in filtered
         assert "Found 1 unknown files" in caplog.text
 
+    def test_filter_allowed_files_warns_on_unknown_files(self, temp_data_dir, caplog):
+        """Test that warning is logged when there are unknown files."""
+        # Create handler with specific allowed subdirs for filtering test
+        handler = FileHandler(
+            temp_data_dir, allowed_subdirs=["feedback", "transcripts"]
+        )
+
+        # Create test files in allowed and unknown directories
+        feedback_dir = temp_data_dir / "feedback"
+        unknown_dir1 = temp_data_dir / "unknown1"
+        unknown_dir2 = temp_data_dir / "unknown2"
+
+        feedback_dir.mkdir()
+        unknown_dir1.mkdir()
+        unknown_dir2.mkdir()
+
+        feedback_file = feedback_dir / "test1.json"
+        unknown_file1 = unknown_dir1 / "test2.json"
+        unknown_file2 = unknown_dir2 / "test3.json"
+
+        feedback_file.write_text("{}")
+        unknown_file1.write_text("{}")
+        unknown_file2.write_text("{}")
+
+        files = [feedback_file, unknown_file1, unknown_file2]
+
+        with caplog.at_level(logging.WARNING):
+            filtered = handler.filter_allowed_files(files)
+
+        assert len(filtered) == 1
+        assert feedback_file in filtered
+        assert unknown_file1 not in filtered
+        assert unknown_file2 not in filtered
+        # Should log warning with correct count of unknown files
+        assert "Found 2 unknown files" in caplog.text
+        # Verify it's logged at WARNING level
+        warning_messages = [
+            record.message for record in caplog.records if record.levelname == "WARNING"
+        ]
+        assert any("Found 2 unknown files" in msg for msg in warning_messages)
+
     def test_filter_allowed_files_empty_list(self, temp_data_dir, caplog):
         """Test filtering with empty file list."""
         # Create handler with specific allowed subdirs for filtering test
         handler = FileHandler(
             temp_data_dir, allowed_subdirs=["feedback", "transcripts"]
         )
-        with caplog.at_level(logging.WARNING):
+        with caplog.at_level(logging.DEBUG):
             filtered = handler.filter_allowed_files([])
 
         assert filtered == []
-        assert "Found 0 unknown files" in caplog.text
+        # Should log debug message when there are no unknown files
+        assert "No unknown files found" in caplog.text
 
     def test_filter_allowed_files_empty_allowed_subdirs(self, temp_data_dir):
         """Test filtering when allowed_subdirs is empty - should allow all files."""
