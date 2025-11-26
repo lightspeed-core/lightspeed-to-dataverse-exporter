@@ -173,7 +173,14 @@ class FileHandler:
             first_dir = relative_path.parts[0] if relative_path.parts else None
             if first_dir in self.allowed_subdirs:
                 filtered_files.append(file)
-        logger.warning("Found %s unknown files", len(files) - len(filtered_files))
+
+        # Log warning if there are unknown files
+        unknown_files = len(files) - len(filtered_files)
+        if unknown_files > 0:
+            logger.warning("Found %s unknown files", unknown_files)
+        else:
+            logger.debug("No unknown files found")
+
         return filtered_files
 
     def collect_files(self) -> list[tuple[Path, int]]:
