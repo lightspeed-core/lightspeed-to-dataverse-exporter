@@ -30,6 +30,12 @@ spec:
   - name: build-platforms
     value:
     - linux/x86_64
+  - name: build-source-image
+    value: 'true'
+  - name: prefetch-input
+    value: '[{"type": "pip", "path": ".", "allow_binary": "true", "requirements_files": ["requirements.txt"]}]'
+  - name: hermetic
+    value: 'true'
   - name: dockerfile
     value: Containerfile
   pipelineSpec:
