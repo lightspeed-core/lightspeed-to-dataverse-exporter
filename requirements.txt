@@ -354,7 +354,7 @@ requests-oauthlib==2.0.0 \
     --hash=sha256:7dd8a5c40426b779b0868c404bdef9768deccf22749cde15852df527e6269b36 \
     --hash=sha256:b3dffaebd884d8cd778494369603a9e7b58d29111bf6b41bdc2dcd87203af4e9
     # via kubernetes
-rich==14.1.0 \
+rich==14.2.0 \
     --hash=sha256:536f5f1785986d6dbdea3c75205c473f970777b4a0d6c6dd1b696aa05a3fa04f \
     --hash=sha256:e497a48b844b0320d45007cdebfeaeed8db2a4f4bcf49f15e455cfc4af11eaa8
     # via lightspeed-to-dataverse-exporter
