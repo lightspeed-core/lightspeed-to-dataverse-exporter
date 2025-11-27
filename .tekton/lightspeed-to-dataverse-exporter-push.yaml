@@ -27,9 +27,13 @@ spec:
   - name: dockerfile
     value: Containerfile
   - name: prefetch-input
-    value: '[{"type": "pip", "path": ".", "allow_binary": "true"}]'
+    value: '[{"type": "pip", "path": ".", "allow_binary": "true", "requirements_files": ["requirements.x86_64.txt", "requirements.aarch64.txt"]}]'
   - name: build-source-image
     value: 'true'
+  - name: build-platforms
+    value:
+    - linux/x86_64
+    - linux-mxlarge/arm64
   pipelineSpec:
     description: |
       This pipeline is ideal for building container images from a Containerfile while maintaining trust after pipeline customization.
