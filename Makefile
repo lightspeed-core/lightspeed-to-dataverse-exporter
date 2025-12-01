@@ -53,3 +53,4 @@ clean-deployment-stage: ## Remove stage deployment
 requirements: pyproject.toml ## Generate requirements.txt file for Konflux
 	uv pip compile pyproject.toml -o requirements.x86_64.txt --generate-hashes --python-platform x86_64-unknown-linux-gnu
 	uv pip compile pyproject.toml -o requirements.aarch64.txt --generate-hashes --python-platform aarch64-unknown-linux-gnu
+	uv run pybuild-deps compile --output-file=requirements-build.txt requirements.aarch64.txt requirements.x86_64.txt

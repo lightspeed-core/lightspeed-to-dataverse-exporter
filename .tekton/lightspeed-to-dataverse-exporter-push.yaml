@@ -27,7 +27,7 @@ spec:
   - name: dockerfile
     value: Containerfile
   - name: prefetch-input
-    value: '[{"type": "pip", "path": ".", "allow_binary": "true", "requirements_files": ["requirements.x86_64.txt", "requirements.aarch64.txt"]}]'
+    value: '[{"type": "rpm", "path": "."}, {"type": "pip", "path": ".", "allow_binary": "false", "requirements_files": ["requirements.x86_64.txt", "requirements.aarch64.txt"], "requirements_build_files": ["requirements-build.txt"]}]'
   - name: build-source-image
     value: 'true'
   - name: build-platforms
