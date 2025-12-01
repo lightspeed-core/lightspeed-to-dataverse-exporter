@@ -18,13 +18,13 @@ WORKDIR /app-root
 # Add explicit files and directories
 # (avoid accidental inclusion of local directories or env files or credentials)
 COPY src ./src
-COPY pyproject.toml LICENSE README.md requirements.txt ./
+COPY pyproject.toml LICENSE README.md requirements.*.txt ./
 
 # this directory is checked by ecosystem-cert-preflight-checks task in Konflux
 COPY LICENSE /licenses/
 
 # Install dependencies
-RUN pip3.12 install --no-cache-dir -r requirements.txt
+RUN pip3.12 install --no-cache-dir -r requirements.$(uname -m).txt
 
 LABEL vendor="Red Hat, Inc."
 
