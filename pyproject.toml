@@ -40,4 +40,5 @@ dev-dependencies = [
     "black>=22.0.0",
     "ruff>=0.1.0",
     "requests-mock>=1.12.1",
-] 
+    "pybuild-deps>=0.1.0",
+]

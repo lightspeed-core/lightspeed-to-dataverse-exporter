@@ -1,4 +1,4 @@
-FROM registry.access.redhat.com/ubi9/python-312-minimal AS builder
+FROM registry.access.redhat.com/ubi9/python-312 AS builder
 
 ARG APP_ROOT=/app-root
 
@@ -15,6 +15,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app-root
 
+USER root
+# Install build dependencies
+RUN dnf install -y --nodocs --setopt=keepcache=0 --setopt=tsflags=nodocs rust cargo
+
 # Add explicit files and directories
 # (avoid accidental inclusion of local directories or env files or credentials)
 COPY src ./src
@@ -22,6 +26,9 @@ COPY pyproject.toml LICENSE README.md requirements.*.txt ./
 
 # this directory is checked by ecosystem-cert-preflight-checks task in Konflux
 COPY LICENSE /licenses/
+
+# install hermetic dependencies
+RUN pip3.12 install --no-cache-dir hatchling==1.28.0
 
 # Install dependencies
 RUN pip3.12 install --no-cache-dir -r requirements.$(uname -m).txt
