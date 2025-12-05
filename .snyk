@@ -1,0 +1,6 @@
+version: v1.25.0
+language-settings:
+  python: "3.12"
+exclude:
+  global:
+    - ingress_token_from_offline_token.py
