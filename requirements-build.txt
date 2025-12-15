@@ -37,7 +37,7 @@ maturin==1.10.2
     # via pydantic-core
 mypy-extensions==1.1.0
     # via mypy
-mypy==1.15.0
+mypy==1.19.1
     # via charset-normalizer
 packaging==25.0
     # via
