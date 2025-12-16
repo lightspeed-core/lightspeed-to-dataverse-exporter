@@ -4,9 +4,9 @@ annotated-types==0.7.0 \
     --hash=sha256:1f02e8b43a8fbbc3f3e0d4f0f4bfc8131bcb4eebe8849b8e5c773f3a1c582a53 \
     --hash=sha256:aff07c09a53a08bc8cfccb9c85b05f1aa9a2a6f23728d790723543408344ce89
     # via pydantic
-cachetools==6.2.2 \
-    --hash=sha256:6c09c98183bf58560c97b2abfcedcbaf6a896a490f534b031b661d3723b45ace \
-    --hash=sha256:8e6d266b25e539df852251cfd6f990b4bc3a141db73b939058d809ebd2590fc6
+cachetools==6.2.4 \
+    --hash=sha256:69a7a52634fed8b8bf6e24a050fb60bff1c9bd8f6d24572b99c32d4e71e62a51 \
+    --hash=sha256:82c5c05585e70b6ba2d3ae09ea60b79548872185d2f24ae1f2709d37299fd607
     # via google-auth
 certifi==2025.11.12 \
     --hash=sha256:97de8790030bbd5c2d96b7ec782fc2f7820ef8dba6db909ccf95449f2d062d4b \
