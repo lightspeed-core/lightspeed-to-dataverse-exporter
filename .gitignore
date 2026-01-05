@@ -219,3 +219,6 @@ venv
 .pdm-python
 dev/
 test-data/
+
+# cursor
+.cursor/
