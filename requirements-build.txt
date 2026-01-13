@@ -31,7 +31,7 @@ hatchling==1.28.0
     #   pygments
     #   typing-inspection
     #   urllib3
-maturin==1.10.2
+maturin==1.11.5
     # via pydantic-core
 mypy-extensions==1.1.0
     # via mypy
@@ -41,7 +41,7 @@ packaging==25.0
     # via
     #   hatchling
     #   setuptools-scm
-pathspec==0.12.1
+pathspec==1.0.3
     # via hatchling
 pluggy==1.6.0
     # via hatchling
@@ -61,7 +61,7 @@ setuptools-scm==9.2.2
     #   pluggy
     #   setuptools-rust
     #   urllib3
-trove-classifiers==2025.12.1.14
+trove-classifiers==2026.1.12.15
     # via hatchling
 types-psutil==7.2.1.20251231
     # via mypy
