@@ -34,6 +34,7 @@ RUN pip3.12 install --no-cache-dir hatchling==1.28.0
 RUN pip3.12 install --no-cache-dir -r requirements.$(uname -m).txt
 
 LABEL vendor="Red Hat, Inc."
+LABEL konflux.additional-tags="latest"
 
 # no-root user is checked in Konflux
 USER 1001
