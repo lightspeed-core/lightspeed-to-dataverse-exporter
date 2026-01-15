@@ -33,7 +33,15 @@ RUN pip3.12 install --no-cache-dir hatchling==1.28.0
 # Install dependencies
 RUN pip3.12 install --no-cache-dir -r requirements.$(uname -m).txt
 
-LABEL vendor="Red Hat, Inc."
+LABEL vendor="Red Hat, Inc." \
+    name="lightspeed-core/dataverse-exporter-rhel9" \
+    com.redhat.component="lightspeed-core/dataverse-exporter" \
+    cpe="cpe:/a:redhat:lightspeed_core:0.4::el9" \
+    io.k8s.display-name="Lightspeed Dataverse Exporter" \
+    summary="A service that exports Lightspeed data to Dataverse for analysis and storage." \
+    description="A service that exports Lightspeed data to Dataverse for analysis and storage. It periodically scans for JSON data files, packages them, and sends them to the Red Hat." \
+    io.k8s.description="A service that exports Lightspeed data to Dataverse for analysis and storage. It periodically scans for JSON data files, packages them, and sends them to the Red Hat." \
+    io.openshift.tags="lightspeed-core,dataverse,lightspeed"
 
 # no-root user is checked in Konflux
 USER 1001
