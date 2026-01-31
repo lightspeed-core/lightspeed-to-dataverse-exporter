@@ -1,4 +1,4 @@
-packages: [rust, cargo]
+packages: [rust, cargo, python3.12, python3.12-devel, python3.12-pip]
 contentOrigin:
   repofiles: ["./ubi.repo"]
 arches: [x86_64, aarch64]
