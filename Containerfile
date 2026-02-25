@@ -32,6 +32,7 @@ RUN unset PIP_INSTALL_OPTIONS PIP_TARGET PIP_HOME PIP_PREFIX 2>/dev/null; \
 FROM registry.redhat.io/ubi9/ubi-minimal:latest
 
 ARG APP_ROOT=/app-root
+ARG NAME_LABEL=lightspeed-core/dataverse-exporter-rhel9
 
 # PYTHONDONTWRITEBYTECODE 1 : disable the generation of .pyc
 # PYTHONUNBUFFERED 1 : force the stdout and stderr streams to be unbuffered
@@ -60,7 +61,7 @@ COPY --from=builder /app-root/src ./src
 COPY --from=builder /app-root/LICENSE /licenses/LICENSE
 
 LABEL vendor="Red Hat, Inc." \
-    name="lightspeed-core/dataverse-exporter-rhel9" \
+    name="${NAME_LABEL}" \
     com.redhat.component="lightspeed-core-dataverse-exporter" \
     cpe="cpe:/a:redhat:lightspeed_core:0.4::el9" \
     io.k8s.display-name="Lightspeed Dataverse Exporter" \
