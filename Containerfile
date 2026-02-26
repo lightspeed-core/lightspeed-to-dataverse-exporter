@@ -1,4 +1,4 @@
-FROM registry.redhat.io/ubi9/ubi-minimal:latest AS builder
+FROM registry.access.redhat.com/ubi9/ubi-minimal:latest AS builder
 
 ARG APP_ROOT=/app-root
 
@@ -29,7 +29,7 @@ RUN pip3.12 install --no-cache-dir hatchling==1.28.0
 RUN unset PIP_INSTALL_OPTIONS PIP_TARGET PIP_HOME PIP_PREFIX 2>/dev/null; \
     pip3.12 install --no-cache-dir --target /app-root/site-packages -r requirements.$(uname -m).txt
 
-FROM registry.redhat.io/ubi9/ubi-minimal:latest
+FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
 
 ARG APP_ROOT=/app-root
 
