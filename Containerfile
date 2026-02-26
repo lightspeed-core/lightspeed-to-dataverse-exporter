@@ -32,7 +32,7 @@ RUN unset PIP_INSTALL_OPTIONS PIP_TARGET PIP_HOME PIP_PREFIX 2>/dev/null; \
 FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
 
 ARG APP_ROOT=/app-root
-ARG NAME_LABEL=lightspeed-core/dataverse-exporter-rhel9
+ARG NAME_LABEL=openshift-lightspeed/lightspeed-to-dataverse-exporter-rhel9
 
 # PYTHONDONTWRITEBYTECODE 1 : disable the generation of .pyc
 # PYTHONUNBUFFERED 1 : force the stdout and stderr streams to be unbuffered
