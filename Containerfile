@@ -21,7 +21,7 @@ COPY src ./src
 COPY pyproject.toml LICENSE README.md requirements.*.txt ./
 
 # Install hermetic build dependency (no PIP_TARGET here to avoid conflict with Cachi2's --home)
-RUN pip3.12 install --no-cache-dir hatchling==1.28.0
+RUN pip3.12 install --no-cache-dir hatchling==1.29.0
 
 # Install runtime dependencies into a known location for copying to final image.
 # Unset Cachi2 pip options (e.g. PIP_INSTALL_OPTIONS=--home) to avoid "Cannot set --home and --prefix together"

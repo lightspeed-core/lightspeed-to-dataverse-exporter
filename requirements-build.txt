@@ -22,7 +22,7 @@ hatch-fancy-pypi-readme==25.1.0
     # via pydantic
 hatch-vcs==0.5.0
     # via urllib3
-hatchling==1.28.0
+hatchling==1.29.0
     # via
     #   annotated-types
     #   hatch-fancy-pypi-readme
@@ -31,21 +31,22 @@ hatchling==1.28.0
     #   pygments
     #   typing-inspection
     #   urllib3
-maturin==1.11.5
+maturin==1.12.6
     # via pydantic-core
 mypy-extensions==1.1.0
     # via mypy
 mypy==1.15.0
     # via charset-normalizer
-packaging==25.0
+packaging==26.0
     # via
     #   hatchling
     #   setuptools-scm
-pathspec==1.0.3
+    #   wheel
+pathspec==1.0.4
     # via hatchling
 pluggy==1.6.0
     # via hatchling
-poetry-core==2.2.1
+poetry-core==2.3.1
     # via
     #   rich
     #   rsa
@@ -61,25 +62,27 @@ setuptools-scm==9.2.2
     #   pluggy
     #   setuptools-rust
     #   urllib3
-trove-classifiers==2026.1.12.15
+trove-classifiers==2026.1.14.14
     # via hatchling
-types-psutil==7.2.1.20251231
+types-psutil==7.2.2.20260130
     # via mypy
-types-setuptools==80.9.0.20251223
+types-setuptools==82.0.0.20260210
     # via mypy
 typing-extensions==4.14.1
     # via
     #   mypy
     #   pydantic-core
     #   setuptools-scm
-wheel==0.45.1
+wheel==0.46.3
     # via
     #   cachetools
     #   python-dateutil
     #   pyyaml
 
 # The following packages are considered to be unsafe in a requirements file:
-setuptools==80.9.0
+setuptools==81.0.0
+    # via charset-normalizer
+setuptools==82.0.0
     # via
     #   cachetools
     #   calver

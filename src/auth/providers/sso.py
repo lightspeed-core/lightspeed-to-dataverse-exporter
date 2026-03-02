@@ -10,7 +10,6 @@ from src import constants
 
 from src.auth.providers.types import AuthProvider, AuthenticationError
 
-
 logger = logging.getLogger(__name__)
 
 SSOEnv = Literal["prod", "stage"]
