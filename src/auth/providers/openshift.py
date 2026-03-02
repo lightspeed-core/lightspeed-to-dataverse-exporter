@@ -9,7 +9,6 @@ import kubernetes.config
 
 from src.auth.providers.types import AuthProvider, AuthenticationError
 
-
 logger = logging.getLogger(__name__)
 
 
