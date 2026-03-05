@@ -2,5 +2,9 @@
     "$schema": "https://docs.renovatebot.com/renovate-schema.json",
     "enabledManagers": [
         "tekton"
+    ],
+    "addLabels": [
+        "lgtm",
+        "approved"
     ]
 }
