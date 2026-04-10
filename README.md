@@ -158,19 +158,19 @@ For detailed deployment options see [DEPLOYMENT.md](DEPLOYMENT.md).
 
 Konflux builds this component using hermetic builds, which means all dependencies must be pre-fetched and verified with cryptographic hashes. To support this, we generate platform-specific Python requirements files with locked versions and hashes.
 
-Generate the requirements files for both x86_64 and aarch64 architectures:
+Bump all dependencies to their latest versions and regenerate requirements:
 
 ```bash
+make bump-deps
 make requirements
 ```
 
 This creates:
 - `requirements.x86_64.txt` - Dependencies for x86_64 Linux systems
 - `requirements.aarch64.txt` - Dependencies for ARM64 Linux systems
+- `requirements-build.txt` - Build-time dependencies for compiled wheels
 
 These files include cryptographic hashes for each dependency, ensuring reproducible and secure hermetic builds. Konflux uses these files to prefetch all dependencies before the build starts.
-
-**Note:** Run this command whenever you update dependencies in `pyproject.toml`
 
 
 ## Documentation

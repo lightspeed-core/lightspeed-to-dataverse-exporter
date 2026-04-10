@@ -1,4 +1,4 @@
-.PHONY: help install install-dev format lint test test-cov check build run-container build-and-push deploy clean-deployment-stage
+.PHONY: help install install-dev format lint test test-cov check build run-container build-and-push deploy clean-deployment-stage bump-deps requirements
 
 # Default target
 help: ## Show this help message
@@ -50,7 +50,10 @@ deploy: build-and-push ## Deploy to stage environment
 clean-deployment-stage: ## Remove stage deployment
 	oc delete -f examples/kubernetes/ || true
 
-requirements: pyproject.toml ## Generate requirements.txt file for Konflux
-	uv pip compile pyproject.toml -o requirements.x86_64.txt --generate-hashes --python-platform x86_64-unknown-linux-gnu
-	uv pip compile pyproject.toml -o requirements.aarch64.txt --generate-hashes --python-platform aarch64-unknown-linux-gnu
+bump-deps: ## Upgrade all dependencies in uv.lock to latest
+	uv lock --upgrade
+
+requirements: pyproject.toml ## Generate requirements.txt files for Konflux
+	uv pip compile pyproject.toml -o requirements.x86_64.txt --generate-hashes --python-platform x86_64-unknown-linux-gnu --upgrade
+	uv pip compile pyproject.toml -o requirements.aarch64.txt --generate-hashes --python-platform aarch64-unknown-linux-gnu --upgrade
 	uv run pybuild-deps compile --output-file=requirements-build.txt requirements.aarch64.txt requirements.x86_64.txt
