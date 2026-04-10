@@ -13,7 +13,6 @@ flit-core==3.12.0
     #   idna
     #   markdown-it-py
     #   mdurl
-    #   mypy-extensions
     #   packaging
     #   pathspec
     #   typing-extensions
@@ -33,10 +32,6 @@ hatchling==1.29.0
     #   urllib3
 maturin==1.13.1
     # via pydantic-core
-mypy-extensions==1.1.0
-    # via mypy
-mypy==1.15.0
-    # via charset-normalizer
 packaging==26.0
     # via
     #   hatchling
@@ -48,16 +43,13 @@ pathspec==1.0.4
 pluggy==1.6.0
     # via hatchling
 poetry-core==2.3.2
-    # via
-    #   rich
-    #   rsa
+    # via rich
 semantic-version==2.10.0
     # via setuptools-rust
 setuptools-rust==1.12.1
     # via maturin
 setuptools-scm==10.0.5
     # via
-    #   charset-normalizer
     #   pluggy
     #   setuptools-rust
 setuptools-scm==7.1.0
@@ -68,44 +60,27 @@ setuptools-scm==9.2.2
     #   urllib3
 trove-classifiers==2026.1.14.14
     # via hatchling
-types-psutil==7.2.2.20260408
-    # via mypy
-types-setuptools==82.0.0.20260408
-    # via mypy
-typing-extensions==4.14.1
-    # via
-    #   mypy
-    #   pydantic-core
-    #   setuptools-scm
+typing-extensions==4.15.0
+    # via setuptools-scm
 vcs-versioning==1.1.1
     # via setuptools-scm
 wheel==0.46.3
-    # via
-    #   cachetools
-    #   python-dateutil
-    #   pyyaml
+    # via python-dateutil
 
 # The following packages are considered to be unsafe in a requirements file:
-setuptools==81.0.0
-    # via charset-normalizer
 setuptools==82.0.1
     # via
-    #   cachetools
     #   calver
     #   certifi
     #   charset-normalizer
     #   maturin
-    #   mypy
     #   pathspec
     #   pluggy
-    #   pyasn1
-    #   pyasn1-modules
     #   pyjwt
     #   python-dateutil
     #   pyyaml
+    #   requests
     #   setuptools-rust
     #   setuptools-scm
     #   trove-classifiers
-    #   types-psutil
-    #   types-setuptools
     #   vcs-versioning
