@@ -21,7 +21,7 @@ hatch-fancy-pypi-readme==25.1.0
     # via pydantic
 hatch-vcs==0.5.0
     # via urllib3
-hatchling==1.29.0
+hatchling==1.30.0
     # via
     #   annotated-types
     #   hatch-fancy-pypi-readme
