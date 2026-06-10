@@ -14,7 +14,7 @@ WORKDIR /app-root
 
 USER root
 # Install build dependencies (rust, cargo, python3.12-devel for any compiled wheels)
-RUN microdnf install -y --nodocs --setopt=keepcache=0 --setopt=tsflags=nodocs rust cargo python3.12 python3.12-devel python3.12-pip
+RUN microdnf install -y --nodocs --setopt=keepcache=0 --setopt=tsflags=nodocs rust cargo g++ python3.12 python3.12-devel python3.12-pip
 
 # Add explicit files and directories
 COPY src ./src
