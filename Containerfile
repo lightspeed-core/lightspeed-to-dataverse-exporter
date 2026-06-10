@@ -4,7 +4,7 @@ ARG APP_ROOT=/app-root
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PYTHONCOERCECLOCALE=0 \
+    PYTHONCOERCECLOCALE=0 \https://github.com/lightspeed-core/lightspeed-to-dataverse-exporter/pull/130/conflict?name=requirements-build.txt&ancestor_oid=4dc9da8de85d6b05a29fdb8cfdb2fe8c1dbb919c&base_oid=2c99a35b4204659f8e046e569c1e8bb24411958f&head_oid=bc36c7c0ce6341eee9b8b163ddd72f834af68e74
     PYTHONUTF8=1 \
     PYTHONIOENCODING=UTF-8 \
     LANG=en_US.UTF-8 \
