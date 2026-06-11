@@ -14,14 +14,14 @@ WORKDIR /app-root
 
 USER root
 # Install build dependencies (rust, cargo, python3.12-devel for any compiled wheels)
-RUN microdnf install -y --nodocs --setopt=keepcache=0 --setopt=tsflags=nodocs rust cargo python3.12 python3.12-devel python3.12-pip
+RUN microdnf install -y --nodocs --setopt=keepcache=0 --setopt=tsflags=nodocs rust cargo g++ python3.12 python3.12-devel python3.12-pip
 
 # Add explicit files and directories
 COPY src ./src
 COPY pyproject.toml LICENSE README.md requirements.*.txt ./
 
 # Install hermetic build dependency (no PIP_TARGET here to avoid conflict with Cachi2's --home)
-RUN pip3.12 install --no-cache-dir hatchling==1.30.0
+RUN pip3.12 install --no-cache-dir hatchling==1.30.1
 
 # Install runtime dependencies into a known location for copying to final image.
 # Unset Cachi2 pip options (e.g. PIP_INSTALL_OPTIONS=--home) to avoid "Cannot set --home and --prefix together"
