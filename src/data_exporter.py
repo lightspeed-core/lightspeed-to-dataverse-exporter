@@ -111,13 +111,13 @@ class DataCollectorService:
             data_chunks: List of data chunks to upload
             collected_files: Original collected files for cleanup
         """
-        for i, data_chunk in enumerate(data_chunks):
-            logger.info("Uploading data chunk %d/%d", i + 1, len(data_chunks))
-            self._upload_single_chunk(data_chunk)
-
-        # Perform final cleanup after all chunks are uploaded
-        if self.cleanup_after_send:
-            self.file_handler.ensure_size_limit(collected_files)
+        try:
+            for i, data_chunk in enumerate(data_chunks):
+                logger.info("Uploading data chunk %d/%d", i + 1, len(data_chunks))
+                self._upload_single_chunk(data_chunk)
+        finally:
+            if self.cleanup_after_send:
+                self.file_handler.ensure_size_limit(collected_files)
 
     def _upload_single_chunk(self, data_chunk: list[Path]) -> None:
         """Upload a single data chunk.
