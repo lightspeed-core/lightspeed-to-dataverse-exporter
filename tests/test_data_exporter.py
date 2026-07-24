@@ -270,7 +270,7 @@ class TestDataCollectorServiceRun:
             mock_gather.assert_called_with(mock_files)
             mock_package.assert_called()
             mock_delete.assert_called_with([Path("/test/file1.json")])
-            mock_ensure.assert_called_with(mock_files)
+            mock_ensure.assert_called_with()
 
     @patch("src.file_handler.FileHandler.collect_files")
     @patch("src.file_handler.FileHandler.gather_data_chunks")
@@ -442,5 +442,5 @@ class TestDataCollectorServiceRun:
                 with pytest.raises(requests.RequestException):
                     service.run()
 
-        mock_ensure.assert_called_with(mock_files)
+        mock_ensure.assert_called_once_with()
         mock_delete.assert_not_called()

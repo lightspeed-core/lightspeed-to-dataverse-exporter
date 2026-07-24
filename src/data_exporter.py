@@ -98,18 +98,15 @@ class DataCollectorService:
         data_chunks = self.file_handler.gather_data_chunks(collected_files)
 
         if data_chunks:
-            self._handle_upload_batch(data_chunks, collected_files)
+            self._handle_upload_batch(data_chunks)
         else:
             logger.info("No data marked for collection in '%s'", self.data_dir)
 
-    def _handle_upload_batch(
-        self, data_chunks: list[list[Path]], collected_files: list[tuple[Path, int]]
-    ) -> None:
+    def _handle_upload_batch(self, data_chunks: list[list[Path]]) -> None:
         """Handle uploading a batch of data chunks.
 
         Args:
             data_chunks: List of data chunks to upload
-            collected_files: Original collected files for cleanup
         """
         try:
             for i, data_chunk in enumerate(data_chunks):
@@ -117,7 +114,7 @@ class DataCollectorService:
                 self._upload_single_chunk(data_chunk)
         finally:
             if self.cleanup_after_send:
-                self.file_handler.ensure_size_limit(collected_files)
+                self.file_handler.ensure_size_limit()
 
     def _upload_single_chunk(self, data_chunk: list[Path]) -> None:
         """Upload a single data chunk.
