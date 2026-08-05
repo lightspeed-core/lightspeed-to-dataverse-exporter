@@ -37,6 +37,7 @@ def package_files_into_tarball(
     Returns:
         BytesIO object representing the tarball.
     """
+    print("Hello world")
     tarball_io = io.BytesIO()
     with tarfile.open(fileobj=tarball_io, mode="w:gz") as tar:
         # arcname parameter is set to a stripped path to avoid including
