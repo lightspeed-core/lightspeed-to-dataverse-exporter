@@ -9,7 +9,7 @@ import yaml
 import json
 from os import environ
 from pathlib import Path
-from typing import TypeVar, cast, get_args
+from typing import Literal, TypeVar, cast, get_args
 
 from pydantic import ValidationError
 
@@ -25,6 +25,10 @@ class Args(argparse.Namespace):
     mode: AuthMode
     config: Path | None
     data_dir: Path | None
+    data_mode: Literal["json", "otel"] | None
+    ledger_file: Path | None
+    otel_active_file: str | None
+    archive_path_prefix: str | None
     service_id: str | None
     ingress_server_url: str | None
     ingress_server_auth_token: str | None
@@ -69,6 +73,32 @@ def parse_args() -> Args:
         "--data-dir",
         type=Path,
         help="Directory containing data to export",
+    )
+
+    parser.add_argument(
+        "--data-mode",
+        choices=("json", "otel"),
+        default=None,
+        help="Data ingestion mode: 'json' for Classic JSON or 'otel' for rotated JSONL",
+    )
+
+    parser.add_argument(
+        "--ledger-file",
+        type=Path,
+        default=None,
+        help="Path to the OTEL upload acknowledgment ledger",
+    )
+
+    parser.add_argument(
+        "--otel-active-file",
+        default=None,
+        help="Collector active JSONL filename to exclude from OTEL ingestion",
+    )
+
+    parser.add_argument(
+        "--archive-path-prefix",
+        default=None,
+        help="Relative prefix for OTEL archive members",
     )
 
     parser.add_argument(
@@ -276,6 +306,8 @@ def main() -> int:
         if args.config:
             logger.info("Using configuration from %s", args.config)
 
+        data_mode = first_not_none(args.data_mode, config_dict.get("data_mode"), "json")
+
         config = DataCollectorSettings(
             data_dir=first_not_none(args.data_dir, config_dict.get("data_dir")),
             service_id=first_not_none(args.service_id, config_dict.get("service_id")),
@@ -317,6 +349,20 @@ def main() -> int:
             ),
             allowed_subdirs=first_not_none(
                 args.allowed_subdirs, config_dict.get("allowed_subdirs"), []
+            ),
+            data_mode=data_mode,
+            ledger_file=first_not_none(
+                args.ledger_file, config_dict.get("ledger_file")
+            ),
+            otel_active_file=first_not_none(
+                args.otel_active_file,
+                config_dict.get("otel_active_file"),
+                "traces.jsonl",
+            ),
+            archive_path_prefix=first_not_none(
+                args.archive_path_prefix,
+                config_dict.get("archive_path_prefix"),
+                "v1/" if data_mode == "otel" else "",
             ),
         )
 

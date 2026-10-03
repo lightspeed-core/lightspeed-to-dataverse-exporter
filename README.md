@@ -22,6 +22,7 @@ Create a `config.yaml` file. See example: [config.yaml.example](config.yaml.exam
 
 ```yaml
 data_dir: "/path/to/data"
+data_mode: "json"  # Classic JSON ingestion
 service_id: "your-service-id"
 ingress_server_url: "https://console.redhat.com/api/ingress/v1/upload"
 collection_interval: 3600  # 1 hour (set to 0 for single-shot mode)
@@ -30,6 +31,25 @@ cleanup_after_send: true
 # Optional logging settings
 log_level: "INFO"  # Options: DEBUG, INFO, WARNING, ERROR
 rich_logs: false   # Enable rich colored logging output
+```
+
+For rotated OTEL JSONL ingestion, replace the active Classic `data_mode` and
+`data_dir` values with this block. `FileExporter` remains the sole owner and
+producer of source backups; it creates closed files with unique, immutable
+retained names. The exporter never modifies source files and deduplicates
+acknowledgments by filename alone, so do not rewrite or reuse an acknowledged
+backup name. The `/input` source mount must be read-only; `/state` must be a
+separate writable directory retained as long as source files remain.
+`archive_path_prefix` configures each TAR member path. The version-1 ledger
+stores only each acknowledged filename and its Ingress request ID.
+
+```yaml
+# data_mode: otel
+# data_dir: /input
+# otel_active_file: traces.jsonl
+# ledger_file: /state/ledger.json
+# archive_path_prefix: v1/
+# collection_interval: 60
 ```
 
 **Option 2: Using command-line arguments only**
