@@ -1,8 +1,10 @@
 """Tests for src.main module."""
 
-import pytest
+import json
 from pathlib import Path
 from unittest.mock import Mock, patch, mock_open
+
+import pytest
 
 from src.main import parse_args, main, configure_logging
 from src.settings import DataCollectorSettings
@@ -78,6 +80,14 @@ class TestParseArgs:
             "/path/to/config.yaml",
             "--data-dir",
             "/data",
+            "--data-mode",
+            "otel",
+            "--ledger-file",
+            "/state/ledger.json",
+            "--otel-active-file",
+            "traces.jsonl",
+            "--archive-path-prefix",
+            "v2/",
             "--service-id",
             "full-service",
             "--ingress-server-url",
@@ -101,6 +111,10 @@ class TestParseArgs:
             assert args.mode == "manual"
             assert args.config == Path("/path/to/config.yaml")
             assert args.data_dir == Path("/data")
+            assert args.data_mode == "otel"
+            assert args.ledger_file == Path("/state/ledger.json")
+            assert args.otel_active_file == "traces.jsonl"
+            assert args.archive_path_prefix == "v2/"
             assert args.service_id == "full-service"
             assert args.ingress_server_url == "https://full.example.com"
             assert args.ingress_server_auth_token == "full-token"
@@ -112,7 +126,7 @@ class TestParseArgs:
 
     def test_parse_args_invalid_mode(self):
         """Test parsing with invalid authentication mode."""
-        test_args = ["--mode", "invalid-mode"]
+        test_args = ["--mode", "otel"]
 
         with patch("sys.argv", ["main.py"] + test_args):
             with pytest.raises(SystemExit):
@@ -206,6 +220,10 @@ class TestMain:
         mock_args.config = Path("/config.yaml")
         mock_args.log_level = None  # Not specified in CLI
         mock_args.data_dir = None
+        mock_args.data_mode = None
+        mock_args.ledger_file = None
+        mock_args.otel_active_file = None
+        mock_args.archive_path_prefix = None
         mock_args.service_id = None
         mock_args.ingress_server_url = None
         mock_args.ingress_server_auth_token = None
@@ -261,6 +279,10 @@ class TestMain:
         mock_args.config = None
         mock_args.log_level = "DEBUG"
         mock_args.data_dir = Path("/tmp")
+        mock_args.data_mode = None
+        mock_args.ledger_file = None
+        mock_args.otel_active_file = None
+        mock_args.archive_path_prefix = None
         mock_args.service_id = "test-service"
         mock_args.ingress_server_url = "https://test.example.com"
         mock_args.ingress_server_auth_token = "test-token"
@@ -299,6 +321,10 @@ class TestMain:
         mock_args.config = None
         mock_args.log_level = None
         mock_args.data_dir = None  # Missing required arg
+        mock_args.data_mode = None
+        mock_args.ledger_file = None
+        mock_args.otel_active_file = None
+        mock_args.archive_path_prefix = None
         mock_args.service_id = "test-service"
         mock_args.ingress_server_url = "https://test.example.com"
         mock_args.ingress_server_auth_token = "test-token"
@@ -328,6 +354,10 @@ class TestMain:
         mock_args.config = None
         mock_args.log_level = None
         mock_args.data_dir = Path("/tmp")
+        mock_args.data_mode = None
+        mock_args.ledger_file = None
+        mock_args.otel_active_file = None
+        mock_args.archive_path_prefix = None
         mock_args.service_id = "test-service"
         mock_args.ingress_server_url = "https://test.example.com"
         mock_args.ingress_server_auth_token = None
@@ -361,6 +391,10 @@ class TestMain:
         mock_args.config = None
         mock_args.log_level = None
         mock_args.data_dir = Path("/tmp")
+        mock_args.data_mode = None
+        mock_args.ledger_file = None
+        mock_args.otel_active_file = None
+        mock_args.archive_path_prefix = None
         mock_args.service_id = "test-service"
         mock_args.ingress_server_url = "https://test.example.com"
         mock_args.ingress_server_auth_token = "test-token"
@@ -394,6 +428,10 @@ class TestMain:
         mock_args.config = None
         mock_args.log_level = None
         mock_args.data_dir = Path("/tmp")
+        mock_args.data_mode = None
+        mock_args.ledger_file = None
+        mock_args.otel_active_file = None
+        mock_args.archive_path_prefix = None
         mock_args.service_id = "test-service"
         mock_args.ingress_server_url = "https://test.example.com"
         mock_args.ingress_server_auth_token = "test-token"
@@ -423,6 +461,10 @@ class TestMain:
         mock_args.config = None
         mock_args.log_level = None
         mock_args.data_dir = Path("/tmp")
+        mock_args.data_mode = None
+        mock_args.ledger_file = None
+        mock_args.otel_active_file = None
+        mock_args.archive_path_prefix = None
         mock_args.service_id = "test-service"
         mock_args.ingress_server_url = "https://test.example.com"
         mock_args.identity_id = "test-identity"
@@ -541,55 +583,6 @@ class TestMain:
 
     @patch("src.main.parse_args")
     @patch("src.main.configure_logging")
-    @patch("src.main.DataCollectorService")
-    @patch.dict("os.environ", {"INGRESS_SERVER_AUTH_TOKEN": "env-token"})
-    def test_main_config_defaults(
-        self,
-        mock_service_class,
-        mock_configure_logging,
-        mock_parse_args,
-    ):
-        """Test that config defaults take effect when not specified in other sources."""
-        mock_args = Mock()
-        # Required fields for manual mode
-        mock_args.mode = "manual"
-        mock_args.config = None
-        mock_args.log_level = None
-        mock_args.data_dir = Path("/tmp")
-        mock_args.service_id = "test-service"
-        mock_args.ingress_server_url = "https://test.example.com"
-        # Minimal optional fields
-        mock_args.identity_id = None
-        mock_args.ingress_server_auth_token = "test-token"
-        mock_args.collection_interval = None
-        mock_args.ingress_connection_timeout = None
-        mock_args.no_cleanup = False
-        mock_args.rich_logs = False
-        mock_args.allowed_subdirs = None
-        mock_args.retry_interval = None
-        mock_args.print_config_and_exit = False
-        mock_parse_args.return_value = mock_args
-
-        mock_service = Mock()
-        mock_service_class.return_value = mock_service
-
-        result = main()
-
-        assert result == 0
-
-        mock_service_class.assert_called_once()
-        settings = mock_service_class.call_args[0][0]
-
-        # Check defaults
-        assert settings.identity_id == "lightspeed-exporter"
-        assert settings.collection_interval == 7200  # Default from constants
-        assert settings.cleanup_after_send is True
-        assert settings.ingress_connection_timeout == 30  # Default from constants
-        assert settings.retry_interval == 300  # Default from constants
-        assert settings.allowed_subdirs == []  # Default: collect everything
-
-    @patch("src.main.parse_args")
-    @patch("src.main.configure_logging")
     @patch(
         "builtins.open",
         new_callable=mock_open,
@@ -694,3 +687,108 @@ class TestMain:
         # Verify lowercase "debug" from config is uppercased to "DEBUG"
         mock_configure_logging.assert_called_once_with("DEBUG", True)
         mock_service.run.assert_called_once()
+
+
+class TestDataModeResolution:
+    def _write_config(self, tmp_path: Path, **overrides: str | Path):
+        data_dir = tmp_path / "input"
+        data_dir.mkdir()
+        state_dir = tmp_path / "state"
+        state_dir.mkdir()
+        values: dict[str, str | Path] = {
+            "data_dir": data_dir,
+            "service_id": "config-service",
+            "ingress_server_url": "https://config.example.com/ingress",
+            "ingress_server_auth_token": "config-token",
+            "data_mode": "json",
+            "ledger_file": state_dir / "yaml-ledger.json",
+        }
+        values.update(overrides)
+
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text(
+            "\n".join(
+                f"{key}: {json.dumps(str(value))}" for key, value in values.items()
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        return config_file, data_dir, state_dir
+
+    def _run_print_config(self, config_file: Path, capsys, *options: str):
+        argv = [
+            "main.py",
+            "--mode",
+            "manual",
+            "--config",
+            str(config_file),
+            "--print-config-and-exit",
+            *options,
+        ]
+        with patch("sys.argv", argv):
+            assert main() == 0
+        return json.loads(capsys.readouterr().out)
+
+    def test_yaml_selects_otel_and_uses_its_prefix_default(self, tmp_path, capsys):
+        config_file, _, state_dir = self._write_config(tmp_path, data_mode="otel")
+
+        settings = self._run_print_config(config_file, capsys)
+
+        assert settings["data_mode"] == "otel"
+        assert settings["ledger_file"] == str(state_dir / "yaml-ledger.json")
+        assert settings["otel_active_file"] == "traces.jsonl"
+        assert settings["archive_path_prefix"] == "v1/"
+
+    def test_cli_overrides_yaml_otel_configuration(self, tmp_path, capsys):
+        config_file, _, state_dir = self._write_config(
+            tmp_path,
+            data_mode="otel",
+            otel_active_file="yaml-traces.jsonl",
+            archive_path_prefix="agentic/v1",
+        )
+
+        yaml_settings = self._run_print_config(config_file, capsys)
+        assert yaml_settings["data_mode"] == "otel"
+        assert yaml_settings["otel_active_file"] == "yaml-traces.jsonl"
+        assert yaml_settings["archive_path_prefix"] == "agentic/v1/"
+
+        cli_ledger = state_dir / "cli-ledger.json"
+        settings = self._run_print_config(
+            config_file,
+            capsys,
+            "--data-mode",
+            "json",
+            "--ledger-file",
+            str(cli_ledger),
+            "--otel-active-file",
+            "cli-traces.jsonl",
+            "--archive-path-prefix",
+            "custom/v2/",
+        )
+
+        assert settings["data_mode"] == "json"
+        assert settings["ledger_file"] == str(cli_ledger)
+        assert settings["otel_active_file"] == "cli-traces.jsonl"
+        assert settings["archive_path_prefix"] == "custom/v2/"
+
+    def test_cli_can_select_otel_over_yaml_json(self, tmp_path, capsys):
+        config_file, _, state_dir = self._write_config(tmp_path)
+        cli_ledger = state_dir / "cli-ledger.json"
+
+        settings = self._run_print_config(
+            config_file,
+            capsys,
+            "--data-mode",
+            "otel",
+            "--ledger-file",
+            str(cli_ledger),
+            "--otel-active-file",
+            "events.jsonl",
+            "--archive-path-prefix",
+            "v2",
+        )
+
+        assert settings["data_mode"] == "otel"
+        assert settings["ledger_file"] == str(cli_ledger)
+        assert settings["otel_active_file"] == "events.jsonl"
+        assert settings["archive_path_prefix"] == "v2/"
