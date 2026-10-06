@@ -3,6 +3,7 @@
 
 # Required settings
 data_dir: "/path/to/your/data/directory"
+data_mode: json
 
 # List of subdirectories to collect from
 # Empty list or not specified = collect from all subdirectories
@@ -22,3 +23,15 @@ ingress_connection_timeout: 30           # HTTP timeout in seconds
 # Logging settings (optional)
 log_level: "INFO"                        # Options: DEBUG, INFO, WARNING, ERROR
 rich_logs: false                         # Enable rich colored logging output
+
+# OTEL rotated-file ingestion. To enable it, comment out the Classic data_dir
+# and data_mode above and uncomment this block. /input is a read-only source
+# mount; /state is a separate writable directory retained for as long as source
+# files remain.
+# archive_path_prefix controls the configurable path of each TAR member.
+# data_mode: otel
+# data_dir: "/input"
+# otel_active_file: traces.jsonl
+# ledger_file: /state/ledger.json
+# archive_path_prefix: v1/
+# collection_interval: 60
