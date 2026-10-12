@@ -169,6 +169,28 @@ When adding, removing, or modifying dependencies in this project, you must updat
    uv export --format requirements.txt --no-emit-project > requirements.txt
    ```
 
+### Updating the RPM lockfile
+
+Konflux prefetches the exact packages in `rpms.lock.yaml` and installs them
+without network access. The Containerfile uses `ubi9/ubi-minimal:latest`, so
+the base image can change even when this repository's dependencies do not.
+Regenerate the RPM lockfile when updating RPM inputs or when locked packages
+no longer match packages installed in the base image.
+
+Build the [rpm-lockfile-prototype](https://github.com/konflux-ci/rpm-lockfile-prototype#running-in-a-container)
+generator image using its upstream instructions. Then, from this repository:
+
+```bash
+podman run --rm --security-opt label=disable -v "$PWD:/work" \
+  localhost/rpm-lockfile-prototype:latest \
+  --containerfile Containerfile --outfile rpms.lock.yaml rpms.in.yaml
+```
+
+The generator resolves both architectures listed in `rpms.in.yaml` against
+the Containerfile's base image. Commit the regenerated lockfile, including
+dependency versions and checksums; do not hand-edit individual RPM entries.
+Validate the change with the Konflux hermetic builds for both architectures.
+
 ## Questions?
 
 If you have questions about the build process or contributing guidelines, please open an issue or reach out to the maintainers.
