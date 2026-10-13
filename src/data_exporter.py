@@ -8,6 +8,9 @@ it is used for ingress authentication instead of cluster pull-secret.
 """
 
 import io
+import json
+import os
+import stat
 import pathlib
 import tarfile
 from pathlib import Path
@@ -18,6 +21,12 @@ import requests
 
 from src.file_handler import FileHandler
 from src.ingress_client import IngressClient
+from src.otel_file_handler import (
+    OtelSourceError,
+    collect_rotated_files,
+    package_jsonl_file,
+)
+from src.otel_ledger import OtelLedger
 
 from src.settings import DataCollectorSettings
 
@@ -91,9 +100,17 @@ class DataCollectorService:
         )
 
         self.shutdown_event = threading.Event()
+        self.otel_ledger = None
+        if config.data_mode == "otel":
+            assert config.ledger_file is not None
+            self.otel_ledger = OtelLedger(config.ledger_file)
 
     def _process_data_collection(self) -> None:
         """Process a single data collection cycle."""
+        if self.config.data_mode == "otel":
+            self._process_otel_collection()
+            return
+
         collected_files = self.file_handler.collect_files()
         data_chunks = self.file_handler.gather_data_chunks(collected_files)
 
@@ -101,6 +118,58 @@ class DataCollectorService:
             self._handle_upload_batch(data_chunks)
         else:
             logger.info("No data marked for collection in '%s'", self.data_dir)
+
+    def _process_otel_collection(self) -> None:
+        """Upload closed backups without modifying collector-owned sources."""
+        assert self.otel_ledger is not None
+        sources = collect_rotated_files(self.data_dir, self.config.otel_active_file)
+        self.otel_ledger.prune({source.name for source in sources})
+
+        for source in sources:
+            if self.otel_ledger.is_uploaded(source.name):
+                continue
+            member_name = (
+                self.config.archive_path_prefix + source.with_suffix(".json").name
+            )
+            tarball = None
+            try:
+                # Keep one no-follow descriptor for conversion.
+                with os.fdopen(
+                    os.open(source, os.O_RDONLY | os.O_NOFOLLOW), "rb"
+                ) as stream:
+                    before = os.fstat(stream.fileno())
+                    if not stat.S_ISREG(before.st_mode):
+                        raise OtelSourceError("Source is not a regular file")
+                    tarball = package_jsonl_file(stream, member_name)
+                    after = os.fstat(stream.fileno())
+                    if (before.st_size, before.st_mtime_ns) != (
+                        after.st_size,
+                        after.st_mtime_ns,
+                    ):
+                        raise OtelSourceError("Source changed while converting")
+            except (
+                OtelSourceError,
+                OSError,
+                UnicodeError,
+                json.JSONDecodeError,
+            ) as error:
+                if tarball is not None:
+                    tarball.close()
+                logger.error(
+                    "Cannot package OTEL source '%s' as '%s': %s",
+                    source,
+                    member_name,
+                    error,
+                )
+                continue
+
+            # Upload and ledger errors must escape the per-source error handler.
+            # In particular, a broken ledger must stop even the continuous loop.
+            try:
+                request_id = self.ingress_client.upload_tarball(tarball)
+                self.otel_ledger.mark_uploaded(source.name, request_id)
+            finally:
+                tarball.close()
 
     def _handle_upload_batch(self, data_chunks: list[list[Path]]) -> None:
         """Handle uploading a batch of data chunks.

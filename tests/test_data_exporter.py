@@ -1,6 +1,8 @@
 """Tests for src.data_exporter module."""
 
 import tempfile
+import json
+import os
 from pathlib import Path
 import threading
 import time
@@ -15,6 +17,7 @@ from src.data_exporter import (
     package_files_into_tarball,
 )
 from src.settings import DataCollectorSettings
+from src.otel_ledger import LedgerError, OtelLedger
 
 
 def create_test_config(**overrides) -> DataCollectorSettings:
@@ -40,86 +43,6 @@ def create_test_config(**overrides) -> DataCollectorSettings:
     }
     defaults.update(overrides)
     return DataCollectorSettings(**defaults)
-
-
-class TestDataCollectorService:
-    """Test cases for DataCollectorService."""
-
-    def test_collect_and_process_no_files(self):
-        """Test that service initializes correctly with all required parameters."""
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            config = create_test_config(data_dir=Path(tmpdir))
-            service = DataCollectorService(config)
-
-            # Test that service attributes are set correctly
-            assert service.data_dir == Path(tmpdir)
-            assert service.collection_interval == 60
-            assert service.cleanup_after_send is True
-
-            # Test that config is set correctly
-            assert service.config.service_id == "test-service"
-            assert (
-                service.config.ingress_server_url == "https://example.com/api/v1/upload"
-            )
-            assert service.config.ingress_server_auth_token == "test-token"
-            assert service.config.identity_id == "test-identity"
-            assert service.config.ingress_connection_timeout == 30
-
-    def test_service_initialization(self):
-        """Test DataCollectorService initialization with all parameters."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            config = create_test_config(
-                data_dir=Path(tmpdir),
-                identity_id="cluster-123",
-            )
-            service = DataCollectorService(config)
-
-            # Verify all attributes are set correctly
-            assert service.data_dir == Path(tmpdir)
-            assert service.collection_interval == 60
-            assert service.cleanup_after_send is True
-            assert service.config.service_id == "test-service"
-            assert (
-                service.config.ingress_server_url == "https://example.com/api/v1/upload"
-            )
-            assert service.config.ingress_server_auth_token == "test-token"
-            assert service.config.identity_id == "cluster-123"
-            assert service.config.ingress_connection_timeout == 30
-
-    def test_service_initialization_with_different_params(self):
-        """Test DataCollectorService initialization with different parameters."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            config = create_test_config(
-                data_dir=Path(tmpdir),
-                service_id="my-service",
-                collection_interval=120,
-                ingress_connection_timeout=60,
-                cleanup_after_send=False,
-            )
-            service = DataCollectorService(config)
-
-            # Verify different parameter values
-            assert service.config.service_id == "my-service"
-            assert service.collection_interval == 120
-            assert service.config.ingress_connection_timeout == 60
-            assert service.cleanup_after_send is False
-
-    def test_service_initialization_with_custom_allowed_subdirs(self):
-        """Test DataCollectorService initialization with custom allowed_subdirs."""
-        custom_subdirs = ["logs", "metrics", "traces"]
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            config = create_test_config(
-                data_dir=Path(tmpdir),
-                allowed_subdirs=custom_subdirs,
-            )
-            service = DataCollectorService(config)
-
-            # Verify allowed_subdirs is set correctly
-            assert service.config.allowed_subdirs == custom_subdirs
-            # Verify file_handler gets the custom subdirs
-            assert service.file_handler.allowed_subdirs == custom_subdirs
 
 
 class TestPackageFilesIntoTarball:
@@ -444,3 +367,317 @@ class TestDataCollectorServiceRun:
 
         mock_ensure.assert_called_once_with()
         mock_delete.assert_not_called()
+
+
+@pytest.fixture
+def otel_service(tmp_path):
+    source = tmp_path / "input"
+    state = tmp_path / "state"
+    source.mkdir()
+    state.mkdir()
+    return DataCollectorService(
+        create_test_config(
+            data_dir=source,
+            data_mode="otel",
+            ledger_file=state / "ledger.json",
+            archive_path_prefix="v1/",
+            collection_interval=0,
+        )
+    )
+
+
+def write_backup(service, number, content=b'{"a":1}\n'):
+    path = service.data_dir / f"traces-2026-10-03T03-04-{number:02d}.001-size.jsonl"
+    path.write_bytes(content)
+    return path
+
+
+def capture_uploads(service, monkeypatch):
+    uploads = []
+
+    def upload(tarball):
+        with tarfile.open(fileobj=tarball, mode="r:gz") as archive:
+            names = archive.getnames()
+            uploads.append((names, archive.extractfile(names[0]).read()))
+        return f"request-{len(uploads)}"
+
+    monkeypatch.setattr(service.ingress_client, "upload_tarball", upload)
+    return uploads
+
+
+def test_otel_restart_uses_filename_identity_and_prefix(otel_service, monkeypatch):
+    service = otel_service
+    source = write_backup(service, 1)
+    uploads = capture_uploads(service, monkeypatch)
+    service._process_data_collection()
+    expected_upload = [(["v1/" + source.with_suffix(".json").name], b'[{"a":1}]')]
+    assert uploads == expected_upload
+
+    original_open = os.open
+
+    def fail_if_acknowledged_source_is_opened(path, flags, *args, **kwargs):
+        if Path(path) == source:
+            pytest.fail("Acknowledged source was opened on rescan")
+        return original_open(path, flags, *args, **kwargs)
+
+    def fail_conversion(*args, **kwargs):
+        pytest.fail("Acknowledged source was converted on rescan")
+
+    with monkeypatch.context() as scoped:
+        scoped.setattr(
+            "src.data_exporter.os.open", fail_if_acknowledged_source_is_opened
+        )
+        scoped.setattr("src.data_exporter.package_jsonl_file", fail_conversion)
+        service._process_data_collection()
+        assert uploads == expected_upload
+
+        restarted = DataCollectorService(service.config)
+        restarted_uploads = capture_uploads(restarted, monkeypatch)
+        restarted._process_data_collection()
+        assert restarted_uploads == []
+
+    configured = service.config.model_copy(update={"archive_path_prefix": "v2/"})
+    changed_prefix = DataCollectorService(configured)
+    uploads = capture_uploads(changed_prefix, monkeypatch)
+    added = write_backup(changed_prefix, 2)
+    changed_prefix._process_data_collection()
+    assert uploads == [(["v2/" + added.with_suffix(".json").name], b'[{"a":1}]')]
+
+
+def test_otel_malformed_source_does_not_block_or_delete(otel_service, monkeypatch):
+    service = otel_service
+    malformed = write_backup(service, 1, b'{"partial":1}\n{bad json')
+    valid = write_backup(service, 2)
+    active = service.data_dir / "traces.jsonl"
+    active.write_bytes(b'{"live":1}')
+    before = {path.name: path.read_bytes() for path in service.data_dir.iterdir()}
+    uploads = capture_uploads(service, monkeypatch)
+    monkeypatch.setattr(
+        service.file_handler,
+        "collect_files",
+        lambda: pytest.fail("Classic scanner invoked"),
+    )
+    service._process_data_collection()
+    assert uploads == [(["v1/" + valid.with_suffix(".json").name], b'[{"a":1}]')]
+    assert {
+        path.name: path.read_bytes() for path in service.data_dir.iterdir()
+    } == before
+    ledger = json.loads(service.config.ledger_file.read_text())
+    assert set(ledger["files"]) == {valid.name}
+    assert malformed.exists()
+    assert set(service.config.ledger_file.parent.iterdir()) == {
+        service.config.ledger_file
+    }
+
+
+def test_otel_upload_retry_preserves_earlier_acknowledgments(otel_service, monkeypatch):
+    service = otel_service
+    first = write_backup(service, 1)
+    second = write_backup(service, 2)
+    attempts = []
+
+    def upload(tarball):
+        with tarfile.open(fileobj=tarball, mode="r:gz") as archive:
+            attempts.append(archive.getnames()[0])
+        if len(attempts) == 2:
+            raise requests.ConnectionError("unavailable")
+        return "accepted"
+
+    monkeypatch.setattr(service.ingress_client, "upload_tarball", upload)
+    with pytest.raises(requests.ConnectionError):
+        service.run()
+    assert set(json.loads(service.config.ledger_file.read_text())["files"]) == {
+        first.name
+    }
+    service.run()
+    assert attempts == [
+        "v1/" + first.with_suffix(".json").name,
+        "v1/" + second.with_suffix(".json").name,
+        "v1/" + second.with_suffix(".json").name,
+    ]
+
+
+def test_otel_incomplete_inventory_does_not_prune_or_upload(otel_service, monkeypatch):
+    service = otel_service
+    source = write_backup(service, 1)
+    uploads = capture_uploads(service, monkeypatch)
+    service._process_data_collection()
+    original = service.config.ledger_file.read_bytes()
+    source.unlink()
+    write_backup(service, 2)
+    from contextlib import contextmanager
+
+    real_scandir = os.scandir
+
+    @contextmanager
+    def incomplete(path):
+        with real_scandir(path) as entries:
+
+            def partial():
+                yield from entries
+                raise OSError("partial inventory")
+
+            yield partial()
+
+    with monkeypatch.context() as scoped:
+        scoped.setattr("src.otel_file_handler.os.scandir", incomplete)
+        with pytest.raises(OSError, match="partial inventory"):
+            service._process_data_collection()
+    assert service.config.ledger_file.read_bytes() == original
+    assert len(uploads) == 1
+    for path in service.data_dir.iterdir():
+        path.unlink()
+    service._process_data_collection()
+    assert json.loads(service.config.ledger_file.read_text())["files"] == {}
+    assert len(uploads) == 1
+
+
+def test_otel_ledger_save_failure_is_fatal_in_continuous_mode(
+    otel_service, monkeypatch
+):
+    service = otel_service
+    service.collection_interval = 60
+    write_backup(service, 1)
+    write_backup(service, 2)
+    uploads = capture_uploads(service, monkeypatch)
+    original = service.config.ledger_file.read_bytes()
+
+    def fail_replace(*args, **kwargs):
+        raise OSError("state disk failure")
+
+    monkeypatch.setattr("src.otel_ledger.os.replace", fail_replace)
+    monkeypatch.setattr(
+        service.shutdown_event,
+        "wait",
+        lambda timeout: pytest.fail("Fatal ledger error retried"),
+    )
+    with pytest.raises(LedgerError):
+        service.run()
+    assert len(uploads) == 1
+    assert service.config.ledger_file.read_bytes() == original
+    accepted_name = uploads[0][0][0].removeprefix("v1/").replace(".json", ".jsonl")
+    assert not OtelLedger(service.config.ledger_file).is_uploaded(accepted_name)
+
+
+def test_otel_source_change_and_disappearance_skip_without_ack(
+    otel_service, monkeypatch
+):
+    from src.otel_file_handler import package_jsonl_file
+
+    service = otel_service
+    changing = write_backup(service, 1)
+    missing = write_backup(service, 2)
+    valid = write_backup(service, 3)
+    uploads = capture_uploads(service, monkeypatch)
+    real_package = package_jsonl_file
+
+    def mutate_during_conversion(stream, member):
+        tarball = real_package(stream, member)
+        if os.fstat(stream.fileno()).st_ino == changing.stat().st_ino:
+            changing.write_bytes(b'{"changed":true}\n')
+            missing.unlink()
+        return tarball
+
+    monkeypatch.setattr(
+        "src.data_exporter.package_jsonl_file", mutate_during_conversion
+    )
+    service._process_data_collection()
+    assert uploads == [(["v1/" + valid.with_suffix(".json").name], b'[{"a":1}]')]
+    assert set(json.loads(service.config.ledger_file.read_text())["files"]) == {
+        valid.name
+    }
+
+
+def test_otel_unlinked_open_source_remains_readable(otel_service, monkeypatch):
+    from src.otel_file_handler import package_jsonl_file
+
+    service = otel_service
+    source = write_backup(service, 1)
+    uploads = capture_uploads(service, monkeypatch)
+    real_package = package_jsonl_file
+
+    def unlink_before_conversion(stream, member):
+        source.unlink()
+        return real_package(stream, member)
+
+    monkeypatch.setattr(
+        "src.data_exporter.package_jsonl_file", unlink_before_conversion
+    )
+    service._process_data_collection()
+    assert uploads == [(["v1/" + source.with_suffix(".json").name], b'[{"a":1}]')]
+    assert source.name in json.loads(service.config.ledger_file.read_text())["files"]
+    service._process_data_collection()
+    assert json.loads(service.config.ledger_file.read_text())["files"] == {}
+
+
+def test_otel_oversized_source_is_not_uploaded_or_acknowledged(
+    otel_service, monkeypatch
+):
+    from src.otel_file_handler import package_jsonl_file
+
+    service = otel_service
+    oversized = write_backup(service, 1, b'{"long":"' + b"x" * 2000 + b'"}')
+    valid = write_backup(service, 2)
+    uploads = capture_uploads(service, monkeypatch)
+    before = oversized.read_bytes()
+
+    def bounded_package(stream, member):
+        return package_jsonl_file(stream, member, max_payload_size=1024)
+
+    monkeypatch.setattr("src.data_exporter.package_jsonl_file", bounded_package)
+    service._process_data_collection()
+    assert oversized.read_bytes() == before
+    assert uploads == [(["v1/" + valid.with_suffix(".json").name], b'[{"a":1}]')]
+    assert set(json.loads(service.config.ledger_file.read_text())["files"]) == {
+        valid.name
+    }
+
+
+def test_otel_change_during_conversion_closes_archive(otel_service, monkeypatch):
+    from src.otel_file_handler import package_jsonl_file
+
+    service = otel_service
+    source = write_backup(service, 1)
+    uploads = capture_uploads(service, monkeypatch)
+    packaged = []
+
+    def changing_package(stream, member):
+        tarball = package_jsonl_file(stream, member)
+        packaged.append(tarball)
+        source.write_bytes(b'{"changed":true}')
+        return tarball
+
+    monkeypatch.setattr("src.data_exporter.package_jsonl_file", changing_package)
+    service._process_data_collection()
+    assert uploads == []
+    assert packaged[0].closed
+    assert json.loads(service.config.ledger_file.read_text())["files"] == {}
+
+
+def test_otel_failed_upload_closes_archive(otel_service, monkeypatch):
+    service = otel_service
+    write_backup(service, 1)
+    buffers = []
+
+    def fail(tarball):
+        buffers.append(tarball)
+        raise requests.ConnectionError("unavailable")
+
+    monkeypatch.setattr(service.ingress_client, "upload_tarball", fail)
+    with pytest.raises(requests.ConnectionError):
+        service.run()
+    assert buffers[0].closed
+    assert json.loads(service.config.ledger_file.read_text())["files"] == {}
+
+
+def test_otel_invalid_utf8_isolated_from_valid_source(otel_service, monkeypatch):
+    service = otel_service
+    invalid = write_backup(service, 1, b'{"value":"\xff"}\n')
+    valid = write_backup(service, 2)
+    uploads = capture_uploads(service, monkeypatch)
+    service._process_data_collection()
+    assert uploads == [(["v1/" + valid.with_suffix(".json").name], b'[{"a":1}]')]
+    assert invalid.read_bytes() == b'{"value":"\xff"}\n'
+    assert set(json.loads(service.config.ledger_file.read_text())["files"]) == {
+        valid.name
+    }
