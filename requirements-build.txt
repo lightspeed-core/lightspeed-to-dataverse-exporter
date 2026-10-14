@@ -6,7 +6,7 @@
 #
 calver==2025.10.20
     # via trove-classifiers
-cython==3.2.5
+cython==3.3.0
     # via pyyaml
 expandvars==1.1.2
     # via
@@ -15,12 +15,14 @@ expandvars==1.1.2
     #   yarl
 flit-core==3.12.0
     # via
-    #   idna
     #   markdown-it-py
     #   mdurl
+    #   typing-extensions
+flit-core==4.1.0
+    # via
+    #   idna
     #   packaging
     #   pathspec
-    #   typing-extensions
     #   wheel
 hatch-fancy-pypi-readme==25.1.0
     # via
@@ -30,7 +32,7 @@ hatch-vcs==0.5.0
     # via
     #   attrs
     #   urllib3
-hatchling==1.30.1
+hatchling==1.32.4
     # via
     #   annotated-types
     #   attrs
@@ -41,29 +43,31 @@ hatchling==1.30.1
     #   pygments
     #   typing-inspection
     #   urllib3
-maturin==1.14.0
+maturin==1.15.0
     # via pydantic-core
-packaging==26.2
+packaging==26.3
     # via
     #   hatchling
     #   setuptools-scm
     #   vcs-versioning
+    #   wheel
 pathspec==1.1.1
     # via hatchling
 pkgconfig==1.6.0
     # via aiohttp
 pluggy==1.6.0
     # via hatchling
-poetry-core==2.4.1
+poetry-core==2.5.0
     # via
     #   aiohappyeyeballs
     #   pkgconfig
     #   rich
+    #   tomlkit
 semantic-version==2.10.0
     # via setuptools-rust
-setuptools-rust==1.12.1
+setuptools-rust==1.13.0
     # via maturin
-setuptools-scm==10.0.5
+setuptools-scm==10.3.4
     # via
     #   hatch-vcs
     #   pluggy
@@ -71,23 +75,26 @@ setuptools-scm==10.0.5
     #   urllib3
 setuptools-scm==7.1.0
     # via python-dateutil
-trove-classifiers==2026.6.1.19
+tomlkit==0.15.1
+    # via hatchling
+trove-classifiers==2026.9.21.13
     # via hatchling
 typing-extensions==4.15.0
     # via setuptools-scm
-vcs-versioning==1.1.1
+vcs-versioning==2.6.0
     # via setuptools-scm
-wheel==0.47.0
+wheel==0.48.0
     # via python-dateutil
 
 # The following packages are considered to be unsafe in a requirements file:
 setuptools==82.0.1
+    # via charset-normalizer
+setuptools==84.0.0
     # via
     #   aiohttp
     #   aiosignal
     #   calver
     #   certifi
-    #   charset-normalizer
     #   frozenlist
     #   maturin
     #   multidict
