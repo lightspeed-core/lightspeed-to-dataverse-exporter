@@ -20,9 +20,6 @@ RUN microdnf install -y --nodocs --setopt=keepcache=0 --setopt=tsflags=nodocs ru
 COPY src ./src
 COPY pyproject.toml LICENSE README.md requirements.*.txt ./
 
-# Install hermetic build dependency (no PIP_TARGET here to avoid conflict with Cachi2's --home)
-RUN pip3.12 install --no-cache-dir hatchling==1.32.4
-
 # Install runtime dependencies into a known location for copying to final image.
 # Unset Cachi2 pip options (e.g. PIP_INSTALL_OPTIONS=--home) to avoid "Cannot set --home and --prefix together"
 # when using --target; Konflux may prepend ". /cachi2/cachi2.env && " to this RUN.
