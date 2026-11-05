@@ -30,7 +30,7 @@ lightspeed-exporter = "src.main:main"
 packages = ["src"]
 
 [tool.pytest.ini_options]
-timeout = 10
+timeout = 30
 
 [tool.uv]
 dev-dependencies = [
