@@ -18,7 +18,7 @@ jobs:
         run: |
           sudo apt update
           # qemu is required for arm64 builds
-          sudo apt install -y buildah qemu-user-static
+          sudo apt install -y buildah qemu-user-binfmt
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Build image with Buildah
